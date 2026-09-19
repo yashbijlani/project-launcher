@@ -1,0 +1,1443 @@
+[
+  {
+    "name": "agentdock",
+    "root": "/home/penguin/code/agentdock",
+    "android": false,
+    "docker_compose": true,
+    "package_manager": null,
+    "top_dirs": [
+      "apps",
+      "data",
+      "docker",
+      "docs",
+      "packages",
+      "scripts",
+      "tests",
+      "workers"
+    ],
+    "manifests": [
+      "package.json",
+      "docker-compose.yml",
+      "Dockerfile"
+    ],
+    "readme_title": "AgentDock",
+    "readme_excerpt": "# AgentDock\n\n**Local-first orchestration platform for coding agents.** AgentDock is not\nanother coding agent — it is the control plane and worker runtime that lets you\nrun, monitor, control, test, review, and expose projects worked on by\nOpenCode, Codex, Claude Code, Pi, Copilot CLI, or any generic CLI agent.\n\n```mermaid\nflowchart LR\n    CLI[CLI] <--> API[Control plane\\nREST + SSE]\n    WEB[Dashboard] <--> API\n    API <--> RT[JobRuntime]\n    RT --> OC[OpenCode] & CX[Codex] & CL[Claude] & PI[Pi] & CP[Copilot] & GEN[Any CLI]\n```\n\nFundamental abstraction: **Agent → Workspace → Job → Artifact → Surface → Device**.\n\n## Quick start (Ubuntu/Linux)\n\n```bash\ngit clone <repo> && cd agentdock\n./scripts/install.sh     # node 22+, deps, build, links `agentdock`\nagentdock init\nagentdock doctor\nagentdock serve &         # control plane + local worker on 127.0.0.1:8787\nagentdock project add ~/my-project\nagentdock run --agent opencode --project <id> --prompt \"Add a health endpoint and tests\"\nagentdock attach <job>    # live output; type to send follow-ups\n```\n\nDashboard: http://127.0.0.1:8787/ (works over SSH port-forward).\n\nZero-cost smoke test (no model calls):\n\n```bash\nagentdock test-agent run --project <id>\nagentdock artifacts <job> && agentdock preview <job>\n```\n\n## CLI\n\n```bash\nagentdock status | agents | workers | projects | jobs\nagentdock run --project P --agent codex --prompt \"…\" [--model M] [--mode worktree|main|temp]\nagentdock logs <job> [--follow] | attach <job> | stop <job>\nagentdock artifacts <job> | open <job> | preview <job> | events <job>\nagentdock review <job> --kind visual\nagentdock devices | device install <serial> <artifact> | device screenshot <serial>\nagentdock agent add my-agent --command my-agent   # new agents without core changes\n```\n\nEvery command supports `--json`.\n\n## Setup per agent\n\n| Agent | Requirement | Notes |\n|---|---|---|\n| OpenCode (reference) | `opencode` on PATH; optional `OPENCODE_SERVER_URL` (+`_USERNAME`/`_PASSWORD`) | Uses `opencode run --format json`; attaches to your server when configured. Never exposed publicly. |\n| Codex | `codex` on PATH + your own login | `codex exec --json`; respects your existing auth. |\n| Claude | `claude` on PATH + your own login | `claude -p --output-format stream-json`; SDK integration optional later. |",
+    "package_json": {
+      "name": "agentdock",
+      "scripts": {
+        "build": "npm run build --workspace @agentdock/core && npm run build --workspace @agentdock/agent-sdk && npm run build --workspace @agentdock/adapter-generic && npm run build --workspace @agentdock/adapter-opencode && npm run build --workspace @agentdock/adapter-codex && npm run build --workspace @agentdock/adapter-claude && npm run build --workspace @agentdock/adapter-pi && npm run build --workspace @agentdock/adapter-copilot && npm run build --workspace @agentdock/adapter-fake && npm run build --workspace @agentdock/reviewer-playwright && npm run build --workspace @agentdock/server && npm run build --workspace agentdock && npm run build --workspace @agentdock/web && npm run build --workspace @agentdock/local-worker",
+        "dev": "npm run dev --workspace apps/server",
+        "pretest": "npm run build --workspaces --if-present",
+        "test": "node --test tests/unit/ tests/integration/",
+        "e2e": "node ./scripts/run-e2e.mjs",
+        "lint": "node ./scripts/lint.mjs",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "doctor": "node ./apps/cli/dist/index.js doctor"
+      },
+      "dependencies": [],
+      "devDependencies": [
+        "typescript",
+        "@types/node"
+      ],
+      "workspaces": [
+        "apps/*",
+        "packages/*",
+        "packages/adapters/*",
+        "workers/*"
+      ],
+      "packageManager": null,
+      "type": "module"
+    },
+    "package_json_path": "package.json",
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": {
+      "services": {
+        "agentdock": {
+          "image": null,
+          "build": true,
+          "ports": [],
+          "depends_on": []
+        }
+      },
+      "raw_length": 473
+    },
+    "compose_path": "docker-compose.yml",
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "blindfold-chess",
+    "root": "/home/penguin/code/blindfold-chess",
+    "android": true,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [
+      "app",
+      "scripts"
+    ],
+    "manifests": [
+      "build.gradle",
+      "settings.gradle"
+    ],
+    "readme_title": "Blindfold Chess — voice-first chess for Android",
+    "readme_excerpt": "# Blindfold Chess — voice-first chess for Android\n\nPlay complete chess games without looking at the board. You speak moves,\nthe app validates them against a real rules engine, a local engine replies,\nand Android Text-to-Speech speaks the answer.\n\n```\nAPP:  \"Your move.\"\nYOU:  \"Knight f3.\"\nAPP:  \"Knight f3.\"\nAPP:  \"Knight c6.\"\nYOU:  \"Bishop b5.\"\n```\n\n## Features\n\n- Voice-first blindfold play: push-to-talk (default) or continuous mode\n- Natural chess phrasing (\"e4\", \"knight to f3\", \"castle kingside\", \"O-O\")\n- Ambiguity handling (\"Which knight? Knight from d2 or h2.\")\n- Full rules via chesslib: castling, en passant, promotion, check/mate,\n  stalemate, insufficient material, threefold repetition, fifty-move rule,\n  FEN, PGN, move history\n- Local Stockfish opponent (UCI) with strength/depth/time settings,\n  plus a built-in sparring engine fallback so the game always works\n- Board queries: \"What is on e4?\", \"Where is my queen?\",\n  \"What is attacking e5?\", \"Describe the board.\", material, last moves…\n- Move confirmation mode, undo/redo, repeat, resign\n- Game history with review (board, FEN, PGN, export, play-this-position)\n- Dark, screen-reader-friendly UI; board hidden by default\n- Offline-first, no accounts, no servers\n\n## Build / install\n\nRequirements: JDK 17, Android SDK (platform 34, build-tools 34), Gradle 8.7.\n\n```bash\nexport ANDROID_HOME=~/Android/Sdk\nexport PATH=$ANDROID_HOME/platform-tools:$PATH\n# uses system gradle; wrapper jar intentionally not vendored\ngradle :app:assembleDebug\nadb install -r app/build/outputs/apk/debug/app-debug.apk\n```\n\nRun unit tests (pure JVM, no device needed):\n\n```bash\ngradle :app:testDebugUnitTest\n```\n\n## Stockfish setup (optional, recommended)\n\nThe app plays out of the box with its built-in sparring engine. For full\nStockfish strength, place device binaries at:\n\n```\napp/src/main/assets/stockfish/arm64-v8a/stockfish\napp/src/main/assets/stockfish/armeabi-v7a/stockfish\napp/src/main/assets/stockfish/x86_64/stockfish\n```\n",
+    "package_json": null,
+    "package_json_path": null,
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "book-copilot",
+    "root": "/home/penguin/code/book-copilot",
+    "android": false,
+    "docker_compose": true,
+    "package_manager": null,
+    "top_dirs": [
+      "apps",
+      "data",
+      "packages",
+      "scripts"
+    ],
+    "manifests": [
+      "package.json",
+      "package-lock.json",
+      "requirements.txt",
+      "docker-compose.yml",
+      "Dockerfile"
+    ],
+    "readme_title": "Book Copilot — READ · COMPRESS · REMEMBER",
+    "readme_excerpt": "# Book Copilot — READ · COMPRESS · REMEMBER\n\nTwo experiences: **READ** (AI-assisted reading environment) and **COMPRESS**\n(local-first nonfiction compression engine).\n\n## Quickstart\n\n```bash\ncp .env.example .env\ndocker compose up --build\n# web http://localhost:3000 · api http://localhost:8000\n```\n\nLocal model (default, zero extra config): install llama.cpp, then run its\n**server** (not `llama-cli` — that's the interactive chat tool; `llama-server`\nis the HTTP server from the same project and speaks the OpenAI-compatible API):\n\n```bash\nllama-server -hf openbmb/MiniCPM5-2B-GGUF -ngl 99 -c 8192\n# serves http://localhost:8080/v1 — exactly what AI_BASE_URL points at\n```\n\nThat's it — upload a book and Compress. `-c 8192` gives the section\ncompression calls headroom. With a cloud key instead, point `AI_BASE_URL` /\n`AI_MODEL` / `AI_API_KEY` at OpenAI, OpenRouter, etc.\n\nPDF reading uses a real PDF engine (PDF.js, same as Firefox): full layout,\nthumbnails + outline sidebar, zoom, find-in-page. Selecting text in the PDF\nfeeds the Copilot toolbar exactly like the text view (toggle PDF/Text at the\ntop of the reader). Original files are stored on upload and served back via\n`GET /books/{id}/file`; uploads now report `\"indexed\": true/false` instead of\never 500ing on a good parse.\n\nWithout a reachable model the copilot runs in offline Socratic mode and the\ncompression pipeline uses a deterministic extractive fallback (schema-valid,\nso the whole flow stays testable with no GPU).\n\n## How it maps to the brief\n\n- **Books**: PDF + EPUB upload, library, chapters/sections, resume position (`current_chapter/offset` saved on navigation).\n- **Reader**: clean serif typography, chapter nav, text selection → floating toolbar, highlights, anchored notes, persistent position.\n- **Copilot**: Explain / Challenge / Connect / Apply / Ask. Selection is primary context; backend enriches with surrounding text, pgvector-retrieved related passages, book metadata, notes/highlights/memory, prior interactions.\n- **Chapter Review**: key ideas, reader questions, recall check (no answers), misunderstandings, concepts, connections to earlier chapters. **Test Me** generates questions, waits for your answers, then grades — never reveals upfront.\n- **Reader Memory**: `memory` table (concept/claim/question/interpretation/uncertainty + confidence) fed by interactions; designed for a future cross-book knowledge graph (add `book_id=NULL` global view + entity edges).\n\n## Architecture\n\n```\napps/web  Next.js 14 + TS + Tailwind + Zustand (selection/copilot state)\napps/api  FastAPI + SQLAlchemy + pgvector (single Postgres, no extra vector DB)\npackages/shared  shared TS types\n```\n\nAI abstraction: `app/services/ai.py` → `AIProvider` / `OpenAICompatibleProvider` (env: `AI_BASE_URL/MODEL/KEY` — OpenRouter default, OpenAI, Ollama all work).\nEmbeddings: `app/services/embeddings.py` → `ApiEmbedding` / `HashEmbedding` (`EMBEDDING_MODE=local|api`). Local is a deterministic trigram-hash vector so RAG + docker work with zero keys.\n\n## API sketch\n\n- `POST /books/upload` · `GET /books` · `GET /books/{id}` · `GET /books/{id}/chapters/{i}` · `POST /books/{id}/position`\n- highlights / notes CRUD · `POST /copilot` · `POST /books/{id}/chapters/{i}/review` · `POST .../quiz` · `POST .../quiz/grade` · `GET/POST /books/{id}/memory`",
+    "package_json": {
+      "name": "book-copilot-web",
+      "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "postinstall": "node scripts/copy-pdfjs.mjs"
+      },
+      "dependencies": [
+        "next",
+        "pdfjs-dist",
+        "react",
+        "react-dom",
+        "zustand"
+      ],
+      "devDependencies": [
+        "@types/node",
+        "@types/react",
+        "autoprefixer",
+        "postcss",
+        "tailwindcss",
+        "typescript"
+      ],
+      "workspaces": null,
+      "packageManager": null
+    },
+    "package_json_path": "apps/web/package.json",
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": {
+      "count": 14,
+      "packages": [
+        "fastapi",
+        "uvicorn",
+        "sqlalchemy",
+        "psycopg2-binary",
+        "pgvector",
+        "pydantic",
+        "pydantic-settings",
+        "alembic",
+        "pypdf",
+        "ebooklib",
+        "beautifulsoup4",
+        "lxml",
+        "httpx",
+        "python-multipart"
+      ]
+    },
+    "requirements_path": "apps/api/requirements.txt",
+    "compose": {
+      "services": {
+        "db": {
+          "image": "pgvector/pgvector:pg16",
+          "build": null,
+          "ports": [
+            "5432:5432"
+          ],
+          "depends_on": []
+        },
+        "api": {
+          "image": null,
+          "build": true,
+          "ports": [
+            "8000:8000"
+          ],
+          "depends_on": []
+        },
+        "web": {
+          "image": null,
+          "build": true,
+          "ports": [
+            "3000:3000"
+          ],
+          "depends_on": [
+            "api"
+          ]
+        }
+      },
+      "raw_length": 1586
+    },
+    "compose_path": "docker-compose.yml",
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "bullet_engine",
+    "root": "/home/penguin/code/bullet_engine",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [
+      "bin",
+      "bullet_engine",
+      "config",
+      "logs",
+      "positions",
+      "sample_games",
+      "scripts",
+      "server",
+      "tests",
+      "web",
+      "web_src"
+    ],
+    "manifests": [
+      "package.json",
+      "package-lock.json",
+      "pyproject.toml",
+      "requirements.txt"
+    ],
+    "readme_title": "Bullet Chess Engine — practical winning probability for very fast time controls",
+    "readme_excerpt": "# Bullet Chess Engine — practical winning probability for very fast time controls\n\n`Position -> Stockfish candidates/eval -> feature extraction -> Bullet Move Scoring Model -> move selection`\n\nStockfish remains the source of objective truth. The decision layer asks:\n**\"Given this position, which move is most likely to win this bullet game against a\ntime-pressured opponent?\"** All \"psychology\" features are labeled experimental\nproxies, not claims about human cognition.\n\n## Quick start\n\n```bash\npip install -r requirements.txt\n# Stockfish: bundled at ./bin/stockfish (or set BULLET_STOCKFISH=/path/to/stockfish)\nexport BULLET_STOCKFISH=$(pwd)/bin/stockfish\n\n# Web analysis platform (recommended)\npython scripts/web.py --port 8000\n# → open http://127.0.0.1:8000\n\n# UCI (Cutechess / Arena / lichess-bot style GUIs)\npython -m bullet_engine bullet\n# or\npython scripts/uci_engine.py bullet\n\n# Analyze a position with explanation\npython scripts/analyze.py --fen \"r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4\" --profile bullet\n\n# Benchmark (10 curated positions, prints candidate table)\npython scripts/benchmark.py --profile bullet --depth 10\n\n# Self-play: bullet profile vs raw stockfish, 60+1\npython scripts/self_play.py --white bullet:bullet --black stockfish --rounds 2 --base 60 --inc 1\n\n# Tests\npython -m pytest tests/ -x -q\n```\n\n## UCI options\n\n| Option | Values | Meaning |\n|---|---|---|\n| BulletProfile | default/bullet/blitz/engine/chaos | weight + safety preset |\n| Candidates | 1..24 | MultiPV width |\n| Depth | 1..30 | candidate generation depth |\n| MaxEvalLossCp | 0..1000 | hard safety gate override |\n| LogDb | path | SQLite decision log |\n\n`go wtime btime winc binc / movetime / depth / infinite` all honored.\n\n## BulletLab web platform\n\n`python scripts/web.py --port 8000` → http://127.0.0.1:8000\n\nLichess-inspired analysis workstation with our own branding and one key\ndifferentiator: **Stockfish evaluation and Bullet (practical) evaluation are\nshown as separate concepts everywhere.** Bullet eval is always labeled\n`experimental` with the tooltip: *\"estimates practical difficulty + winning\npotential under time pressure — not objective truth.\"*\n",
+    "package_json": {
+      "scripts": {},
+      "dependencies": [
+        "chess.js",
+        "chessground"
+      ],
+      "devDependencies": [],
+      "workspaces": null,
+      "packageManager": null
+    },
+    "package_json_path": "web_src/package.json",
+    "pyproject": {
+      "scripts": {},
+      "dependencies": [
+        "chess",
+        "pyyaml"
+      ],
+      "frameworks": [],
+      "tooling": [
+        "build-system"
+      ]
+    },
+    "pyproject_path": "pyproject.toml",
+    "requirements": {
+      "count": 3,
+      "packages": [
+        "chess",
+        "pyyaml",
+        "pytest"
+      ]
+    },
+    "requirements_path": "requirements.txt",
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "camera-copilot",
+    "root": "/home/penguin/code/camera-copilot",
+    "android": true,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [
+      "app",
+      "gradle"
+    ],
+    "manifests": [
+      "build.gradle.kts",
+      "settings.gradle.kts",
+      "gradlew"
+    ],
+    "readme_title": null,
+    "readme_excerpt": null,
+    "package_json": null,
+    "package_json_path": null,
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "clash",
+    "root": "/home/penguin/code/clash",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": "npm",
+    "top_dirs": [
+      "app",
+      "components",
+      "data",
+      "lib",
+      "scripts",
+      "tests",
+      "types"
+    ],
+    "manifests": [
+      "package.json",
+      "package-lock.json"
+    ],
+    "readme_title": "CLASH — Find your next round.",
+    "readme_excerpt": "# CLASH — Find your next round.\n\nCombat-sports sparring partner matchmaking: fighters create profiles, discover\ncompatible partners, send sparring requests, browse real Bengaluru gyms and join them.\nStrava + Lichess-style matchmaking + social, for combat sports.\n\n## Tech stack\n\n- **Frontend:** Next.js 14 (App Router) + TypeScript + Tailwind CSS, mobile-first\n- **Backend:** Next.js REST API routes (service layer in `lib/`, no business logic in components)\n- **Database:** JSON-file prototype store (`data/db.json`) behind `lib/db.ts`.\n  Schema mirrors the Postgres design below — swap the backend for Prisma/Postgres\n  without touching the UI or API shapes.\n- **Auth:** `AuthService` abstraction (`lib/auth.tsx`): `login/logout/getCurrentUser/register`.\n  Mock email store now; swap for Supabase Auth / Clerk / Firebase later.\n- **Storage:** `POST /api/photos` validates uploads; prototype persists data-URLs on the\n  profile, production uploads to Supabase Storage/S3 and stores `photo_url`.\n\n## Architecture\n\n```\nWeb UI (app/ + components/)\n  ↓ fetch + x-user-email header\nREST API (app/api/*)          ← thin, validates input\n  ↓\nService layer (lib/db.ts, lib/match.ts, lib/seed-fighters.ts)\n  ↓\nDatabase (data/db.json now; Postgres later) / Storage\n```\n\nAndroid/iOS can call the exact same REST API. Typed clients live in `lib/api/`\n(`fightersApi`, `gymsApi`, `requestsApi`, `usersApi`→`meApi`); shared types in `types/`.\n\n## Database schema (relational design)\n\n`User → FighterProfile → GymMembership → Gym`;\n`FighterProfile → FighterSport → CombatSport` (folded into `disciplines[]` in the prototype);\n`FighterProfile → SparringRequest → FighterProfile`;\nplus `Notification`, `Photo` (`photo_url`), `SavedFighter`, `Availability`\n(folded into `availability_days/times`). UUIDs (prefixed), timestamps,\nindexes planned on weight/height/age/location/gym_id/skill_level/primary_discipline.\n\n## Pages\n\n`/home` dashboard · `/discover` (filters + bottom-sheet on mobile) · `/fighters` ·\n`/fighters/[id]` · `/gyms` · `/gyms/[id]` · `/requests` (received/sent/accepted tabs) ·\n`/profile` · `/profile/edit` (6-step onboarding) · `/settings` · `/notifications` ·\n`/auth/login` · `/auth/register`\n\n## API\n\n```\nGET    /api/fighters?query&w_min&w_max&h_min&h_max&age_min&age_max&skill&fights&discipline&style&intensity&days&times&distance_km&gym_id&gender&sort&limit\nGET    /api/fighters/recommended\nGET    /api/fighters/search?q=boxing+HSR\nGET    /api/fighters/{id}            PATCH /api/fighters/{id}   POST /api/fighters\nPOST   /api/fighters/{id}/block|report (safety: hide + cancel pending, file report)\nGET    /api/gyms?query&discipline&locality&distance_km\nGET    /api/gyms/{id}   GET /api/gyms/{id}/members\nPOST   /api/gyms/{id}/join   DELETE /api/gyms/{id}/leave",
+    "package_json": {
+      "name": "clash",
+      "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "tsc --noEmit",
+        "seed": "tsx scripts/seed.ts",
+        "test": "tsx --test tests/*.test.ts"
+      },
+      "dependencies": [
+        "next",
+        "react",
+        "react-dom"
+      ],
+      "devDependencies": [
+        "@types/node",
+        "@types/react",
+        "@types/react-dom",
+        "autoprefixer",
+        "postcss",
+        "tailwindcss",
+        "tsx",
+        "typescript"
+      ],
+      "workspaces": null,
+      "packageManager": null
+    },
+    "package_json_path": "package.json",
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "desktop-tutor",
+    "root": "/home/penguin/code/desktop-tutor",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [
+      "desktop_tutor",
+      "scripts",
+      "tests"
+    ],
+    "manifests": [
+      "requirements.txt"
+    ],
+    "readme_title": null,
+    "readme_excerpt": null,
+    "package_json": null,
+    "package_json_path": null,
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": {
+      "count": 13,
+      "packages": [
+        "PySide6",
+        "mss",
+        "Pillow",
+        "numpy",
+        "httpx",
+        "pyyaml",
+        "python-dotenv",
+        "pytest",
+        "pytest-asyncio",
+        "pytest-cov",
+        "hypothesis",
+        "ruff",
+        "mypy"
+      ]
+    },
+    "requirements_path": "requirements.txt",
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "freedom",
+    "root": "/home/penguin/code/freedom",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [
+      ".opencode",
+      "findings",
+      "recon",
+      "targets",
+      "tools"
+    ],
+    "manifests": [
+      "package.json",
+      "pnpm-lock.yaml",
+      "package-lock.json",
+      "requirements.txt",
+      "Cargo.toml",
+      "Makefile"
+    ],
+    "readme_title": null,
+    "readme_excerpt": null,
+    "package_json": {
+      "name": "@0xintuition/contracts-v2",
+      "scripts": {
+        "clean": "rm -rf cache out dist",
+        "build": "forge build",
+        "build:ts": "tsup",
+        "extract": "tsx extract-abis.ts && tsx extract-bytecodes.ts",
+        "build:package": "bun run build && bun run extract && bun run build:ts",
+        "prepublishOnly": "bun run build:package",
+        "release:alpha": "npm publish --tag alpha",
+        "fmt": "forge fmt",
+        "fmt:check": "forge fmt --check",
+        "lint": "bun run lint:sol && bun run prettier:check",
+        "lint:sol": "forge fmt --check && bun solhint \"{script,src,tests}/**/*.sol\"",
+        "prettier:check": "prettier --check \"**/*.{json,md,yml}\"",
+        "prettier:write": "prettier --write \"**/*.{json,md,yml}\"",
+        "test": "forge test",
+        "coverage": "forge coverage --no-match-coverage '(script|tests|src/external/curve)'",
+        "test:coverage": "forge coverage",
+        "test:coverage:report": "forge coverage --no-match-coverage '(script|tests|src/external/curve)' --report lcov && genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent",
+        "fetch:roles:summary": "npx tsx script/utils/fetch-roles-summary.ts"
+      },
+      "dependencies": [
+        "@account-abstraction/contracts",
+        "@openzeppelin-v4/contracts",
+        "@openzeppelin-v4/contracts-upgradeable",
+        "@openzeppelin/contracts",
+        "@openzeppelin/contracts-upgradeable",
+        "@prb/math",
+        "solady"
+      ],
+      "devDependencies": [
+        "@types/node",
+        "ethers",
+        "prettier",
+        "solhint",
+        "tsup",
+        "tsx",
+        "typescript"
+      ],
+      "workspaces": null,
+      "packageManager": null,
+      "main": "./dist/index.cjs",
+      "type": "module"
+    },
+    "package_json_path": "recon/intuition/package.json",
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": {
+      "count": 2,
+      "packages": [
+        "requests",
+        "pytest"
+      ]
+    },
+    "requirements_path": "tools/claude-bug-bounty/requirements.txt",
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "gaze_scroll",
+    "root": "/home/penguin/code/gaze_scroll",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": "npm",
+    "top_dirs": [
+      "src",
+      "tests"
+    ],
+    "manifests": [
+      "package.json",
+      "package-lock.json"
+    ],
+    "readme_title": "Gaze Scroll (WebGaze)",
+    "readme_excerpt": "# Gaze Scroll (WebGaze)\n\nExperimental, browser-only eye-tracking scrolling system: look toward the\nlower region of a page and the system infers *intentional* downward\nmovement, then scrolls smoothly. Brief glances never scroll.\n\n**Pipeline:** webcam → gaze estimation → calibration → filtering →\nfixation/movement analysis → intent engine → scroll controller → webpage.\nSee `ARCHITECTURE.md`; heuristics and thresholds in `ALGORITHMS.md`;\ncomparison protocol in `EXPERIMENTS.md`.\n\n## Run\n\n```bash\ncd gaze_scroll\nnpm install\nnpm run dev        # http://localhost:5173\nnpm test           # 27 unit tests (synthetic gaze sequences)\nnpm run build\n```\n\nRequirements:\n\n- Chrome / Edge / Firefox / Safari with webcam access.\n- A **secure context**: `localhost` or HTTPS. Do not open via `file://`\n  (`getUserMedia` will refuse).\n- Internet on first load: WebGazer (`cdn.jsdelivr.net/npm/webgazer@2.0.1`)\n  plus MediaPipe face-mesh files (pinned CDN, configured in\n  `src/config.js`). Close other tabs holding the camera.\n\n## Use (primary experience)\n\n1. Click **Enable camera & tracking** and allow webcam access.\n2. **Calibrate**: read the guidance card, look at each dot and click it\n   (5-point fast or 9-point thorough). Skippable for experimentation.\n   You get a quality score (good/fair/poor) at the end.\n3. **Reading mode**: pick a scroll mode (start with Smooth continuous),\n   tick **Enable automatic scrolling**, and read. Sustain confident\n   downward gaze to scroll; resume reading to stop; look up to go back.\n4. Your wheel, arrow/space keys, or touch **always override instantly**;\n   the red **Stop scrolling** button kills automation immediately.\n\n## Developer mode (Gaze Lab)\n\nThe on-page Gaze Lab shows live gaze/normalized coords, confidence,\nvelocity, persistence, fixation, direction, intent + confidence with a\nper-signal breakdown, scroll velocity, tracking status, calibration\nquality, and gaze target — plus a raw-vs-filtered trajectory canvas, an\nevent stream (fixations, movements, edge dwells, tracking loss), tunable\nparameters, session recording/export (JSON, numbers only), and replay\n(play/pause/restart/speed) that re-drives the full pipeline **without a\nwebcam**. Switch modes during replay to compare strategies on identical\ndata.\n\n## Privacy\n\n- Webcam access is required; all video processing is **on-device**.\n- No video frames are sent anywhere, recorded, or persisted.\n- Session exports contain only anonymized gaze-derived numbers and only\n  on explicit export clicks. Calibration metadata stays in localStorage.",
+    "package_json": {
+      "name": "gaze-scroll",
+      "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
+        "test": "node --test tests/"
+      },
+      "dependencies": [],
+      "devDependencies": [
+        "vite"
+      ],
+      "workspaces": null,
+      "packageManager": null,
+      "type": "module"
+    },
+    "package_json_path": "package.json",
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "geb",
+    "root": "/home/penguin/code/geb",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [
+      "research"
+    ],
+    "manifests": [],
+    "readme_title": "GEB / Gödel journey",
+    "readme_excerpt": "# GEB / Gödel journey\n\nA long-form interactive mathematical documentary that constructs Gödel's First Incompleteness Theorem from formal systems through encoding, diagonalization, truth, and the Halting Problem.\n\n## Run locally\n\nFrom this folder:\n\n```bash\npython3 -m http.server 8000\n```\n\nThen open:\n\n```text\nhttp://localhost:8000\n```\n\nThe entry page is the single coherent journey in `index.html`. It uses Three.js from a browser CDN for the persistent proof-machine scene.\n\nThe earlier exploratory probes remain available at `experiments.html` as research artifacts, not as the main experience.\n\n## Notes\nThe page distinguishes source framing, standard mathematics, toy models, and visual metaphors. It is intentionally explicit about the assumptions behind the incompleteness argument.\n",
+    "package_json": null,
+    "package_json_path": null,
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "gods-eye-view",
+    "root": "/home/penguin/code/gods-eye-view",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": "npm",
+    "top_dirs": [
+      ".gev-cache",
+      ".gev-logs",
+      ".github",
+      "config",
+      "docs",
+      "pinokio",
+      "public",
+      "scripts",
+      "server",
+      "src",
+      "tools"
+    ],
+    "manifests": [
+      "package.json",
+      "package-lock.json"
+    ],
+    "readme_title": "🌐 God's Eye View",
+    "readme_excerpt": "<div align=\"center\">\n\n# 🌐 God's Eye View\n\n[![CI](https://github.com/bilawalsidhu/gods-eye-view/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bilawalsidhu/gods-eye-view/actions/workflows/ci.yml)\n\n### A spy-satellite simulator in your browser — then you realize the sources are public and the data is real.\n\nPhotorealistic 3D globe. Live aircraft, ships, satellites, earthquakes, traffic, and public cameras. Hands-free voice control powered by a realtime AI agent.\n\n*No place left behind.*\n\n![Orbital HUD, a tracked live globe, FLIR terrain — then OPEN SOURCED](docs/media/hero-open-source-reveal.gif)\n\n<a href=\"https://www.youtube.com/@bilawalsidhu\">\n  <img src=\"docs/media/youtube-popular-videos.png\" alt=\"The God's Eye View video series on YouTube\" width=\"100%\">\n</a>\n\n▶️ **From the project behind the viral God's Eye View series** *(formerly WorldView)* — [5M+ on YouTube](https://youtube.com/playlist?list=PL6qSg2I-7_koPbDnSMo0QeeHX_RknA2uv&si=nBGYMoHWQw41v93Q) · [25M+ across socials](https://www.google.com/search?q=god%27s+eye+view)\n\n[![Reached #1 on GitHub Trending](https://img.shields.io/badge/%231_GitHub_Trending-thank_you!-F0A63C?style=flat-square&logo=github)](https://x.com/bilawalsidhu/status/2093798887815348521)\n\n🏆 **Reached #1 on GitHub Trending, daily and weekly · August 2026**\n\n**[#8 Product of the Day](https://www.producthunt.com/products/god-s-eye-view?launch=god-s-eye-view)** · Hunted by Chris Messina, creator of the hashtag\n\n*“pretty cool”* — [Brendan Eich](https://x.com/BrendanEich/status/2094592096401490266), creator of JavaScript and co-founder of Mozilla and Brave · Featured on **[Pinokio](https://pinokio.co/posts/01m1m4p9xxm3qw7dnnpj2wr93g)**\n\n⚡ **Start without API keys.** Install with [Pinokio](https://pinokio.co/apps/github-com-bilawalsidhu-gods-eye-view) or run locally from the terminal. Add optional keys inside the app. **[→ Quick Start](#-quick-start)**\n\n</div>\n\n---\n\n<div align=\"center\">\n\n**[Quick Start](#-quick-start) · [First Five Minutes](#-the-first-five-minutes) · [Talk to It](#-talk-to-it) · [What's Live](#-whats-on-the-globe) · [Under the Hood](#-under-the-hood) · [Keys & Costs](#-api-keys)**\n\n</div>\n\n---\n\n## 🌍 Why This Exists\n\nGod's Eye View brings public signals into one explorable globe. Track the world live. Talk to it. Break it. Extend it.\n\nFlight transponders, ship beacons, orbital elements, seismographs, and public cameras already tell us a lot about the world. God's Eye View puts them in the same place, so you can move between a global picture and an individual aircraft, ship, or street. It runs locally in your browser, with source code you can inspect and extend.\n\n> Half the magic is that it looks like a forbidden cockpit. The other half is that every line of code is inspectable.\n\nMost feeds are live or regularly refreshed. Traffic is simulated along real\nroads using aggregate location data. CCTV camera poses and rocket launch\ntrajectories are coarse estimates.\n\nStart with the included data sources, then add your own. Each layer is a separate module.\n\n---\n\n## 🎛️ What This Thing Does\n",
+    "package_json": {
+      "name": "gods-eye-view",
+      "scripts": {
+        "doctor": "node scripts/setup-doctor.mjs",
+        "format": "node scripts/format.mjs --write",
+        "format:check": "node scripts/format.mjs --check",
+        "dev": "vite",
+        "dev:secure": "./scripts/dev-secure.sh",
+        "opensky:import": "./scripts/opensky-import-client.sh",
+        "build": "vite build",
+        "preview": "vite preview",
+        "test": "node scripts/run-unit-tests.mjs",
+        "test:track": "node scripts/track-regression.mjs",
+        "qa:map-source-tray": "node scripts/qa-map-source-tray.mjs",
+        "check:boundaries": "node scripts/check-package-boundaries.mjs"
+      },
+      "dependencies": [
+        "@mapbox/vector-tile",
+        "cesium",
+        "egm96-universal",
+        "mgrs",
+        "pbf",
+        "satellite.js"
+      ],
+      "devDependencies": [
+        "prettier",
+        "puppeteer",
+        "sharp",
+        "vite",
+        "vite-plugin-cesium",
+        "ws"
+      ],
+      "workspaces": null,
+      "packageManager": null,
+      "type": "module"
+    },
+    "package_json_path": "package.json",
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "human-broker",
+    "root": "/home/penguin/code/human-broker",
+    "android": false,
+    "docker_compose": true,
+    "package_manager": "npm",
+    "top_dirs": [
+      "apps",
+      "db",
+      "docker",
+      "docs",
+      "evals",
+      "packages",
+      "scripts"
+    ],
+    "manifests": [
+      "package.json",
+      "package-lock.json",
+      "pyproject.toml",
+      "docker-compose.yml"
+    ],
+    "readme_title": "Lattice / Human Broker",
+    "readme_excerpt": "# Lattice / Human Broker\n\nA production-oriented prototype of an AI-first, permission-aware human discovery network. The primary primitive is not a feed: it is **human intent → AI understanding → authorized discovery → consented introduction → conversation → outcome feedback**.\n\n## What is implemented\n\n- Conversational onboarding with provenance-aware fact extraction and editable private model\n- Independent profile, discovery, search, category introduction, DM, and contact policies\n- Context-specific public/professional/service/dating search projections\n- One tool-using Broker for people, introductions, profile, memory, and conversations\n- Structured intent and follow-up state; PostgreSQL FTS index + native pgvector recall + deterministic constraints\n- Evidence-grounded candidate cards (no public compatibility scores)\n- Introduction accept/decline/more-context workflow; acceptance grants DM access\n- Permission-checked messaging and inbox summarize/draft/triage endpoints; no auto-send\n- Block/report/reputation/product-event persistence foundations\n- OpenAI-compatible AI Gateway with structured Broker planning and telemetry\n- 120 deterministic fictional users including restrictive Alex Mercer\n- Security/unit tests and synthetic evaluation cases\n- Responsive AI-native Next.js UI\n\n## Architecture\n\nNext.js calls a FastAPI modular monolith through a same-origin proxy. `BrokerService` asks the configured model for a schema-validated plan, resolves references from server-owned session state, and dispatches a narrow `BrokerTools` method. Services contain workflows; pure domain modules contain policies/scoring; SQLAlchemy persists to PostgreSQL/pgvector. Redis is an optional future job transport. See [stage 2 audit](docs/stage2-audit.md), [architecture](docs/architecture.md), [privacy](docs/privacy.md), [matching](docs/matching.md), [person model](docs/person-model.md), [AI](docs/ai.md), [security](docs/security.md), and [evaluation](docs/evaluation.md).\n\n## Local setup\n\nRequirements: Docker, Python 3.11–3.13, Node 20+.\n\n```bash\ncd human-broker\ncp .env.example .env\ndocker compose up -d\npython -m venv .venv\nsource .venv/bin/activate\npip install -e 'apps/api[dev]'\nnpm install\nnpm run seed\n```\n\nRun in two terminals (keep PostgreSQL running; if search reports `database_unavailable`, run `docker compose up -d postgres`):\n\n```bash\nsource .venv/bin/activate\ncd apps/api && uvicorn app.main:app --reload --port 8000\n```\n\n```bash\nnpm run dev\n# open http://localhost:3000\n```\n\nThe Broker requires a real AI provider. The default configuration uses OpenCode Go at `https://opencode.ai/zen/go/v1` with `glm-5.2` for reasoning, fast operations, and evaluation. Set `AI_PROVIDER=opencode_go` and `AI_API_KEY`; `AI_EMBEDDING_MODEL` may remain empty because the first Broker flow uses local deterministic vectors in PostgreSQL. OpenCode Go protocol routing is model-aware: GLM/Kimi use Chat Completions while GPT-5.6 Luna uses Responses. If the key is absent, Broker requests return an explicit configuration error; deterministic providers are used only by tests.\n\nVerify provider connectivity without exposing the key:\n\n```bash\ncurl -X POST http://localhost:8000/api/ai/diagnostics/test \\\n  -H 'content-type: application/json' \\\n  -d '{\"prompt\":\"Reply with exactly BROKER TEST OK\"}'\n```",
+    "package_json": {
+      "name": "human-broker",
+      "scripts": {
+        "dev": "npm --workspace apps/web run dev",
+        "build": "npm --workspace apps/web run build",
+        "test:api": "cd apps/api && pytest",
+        "eval": "cd apps/api && PYTHONPATH=. python ../../evals/run.py --output ../../evals/results/latest.json",
+        "red-team": "python evals/red_team.py",
+        "seed": "cd apps/api && python ../../db/seed/seed.py"
+      },
+      "dependencies": [],
+      "devDependencies": [],
+      "workspaces": [
+        "apps/web",
+        "packages/*"
+      ],
+      "packageManager": null
+    },
+    "package_json_path": "package.json",
+    "pyproject": {
+      "scripts": {},
+      "dependencies": [
+        "fastapi",
+        "uvicorn"
+      ],
+      "frameworks": [
+        "fastapi",
+        "uvicorn",
+        "sqlalchemy"
+      ],
+      "tooling": []
+    },
+    "pyproject_path": "apps/api/pyproject.toml",
+    "requirements": null,
+    "requirements_path": null,
+    "compose": {
+      "services": {
+        "postgres": {
+          "image": "pgvector/pgvector:pg16",
+          "build": null,
+          "ports": [],
+          "depends_on": []
+        },
+        "redis": {
+          "image": "redis:7-alpine",
+          "build": null,
+          "ports": [],
+          "depends_on": []
+        }
+      },
+      "raw_length": 515
+    },
+    "compose_path": "docker-compose.yml",
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "infinite_zoom",
+    "root": "/home/penguin/code/infinite_zoom",
+    "android": true,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [
+      "app",
+      "gradle"
+    ],
+    "manifests": [
+      "build.gradle.kts",
+      "settings.gradle.kts",
+      "gradlew"
+    ],
+    "readme_title": "Infinite Zoom Camera — V0.1",
+    "readme_excerpt": "# Infinite Zoom Camera — V0.1\n\nA working, installable Android camera app and the foundation for AI-powered\n\"infinite zoom\": pinch-zoom with CameraX, still capture, on-device\nsuper-resolution (ONNX Runtime), and an enhanced-result viewer. Fully offline\nafter install — no cloud, no accounts, no analytics.\n\n> Honesty note: super-resolution *reconstructs plausible detail* from what was\n> captured; it cannot literally recover information the sensor never recorded.\n> V0.1 demonstrates the real pipeline (capture → crop → SR → display) that\n> recursive/generative zoom will build on.\n\n## Architecture\n\n```\napp/src/main/java/com/infinitezoom/\n  camera/\n    MainActivity.kt     orchestration: permission, model init, shutter flow\n    CameraController.kt CameraX (Preview + ImageCapture + RGBA analysis stream)\n    CameraScreen.kt     full-screen preview + pinch-to-zoom + overlays\n    ZoomController.kt   UI gesture <-> camera abstraction (pure Kotlin, tested)\n    LivePreviewController.kt  live digital zoom + live AI loop past hw max\n  ml/\n    SuperResolutionModel.kt  interface + UpscaleResult/timings + exceptions\n    OnnxSuperResolution.kt   ONNX Runtime session, ESPCN x3, tiled inference\n    ImageTensorUtils.kt      Y-extract / YCbCr-merge, BT.601\n    TileMath.kt              native-res tiling math (pure Kotlin, tested)\n  pipeline/\n    ZoomPipeline.kt          processCapture(image, zoom) -> PipelineResult\n    ReconstructionState.kt   ReconstructionState, CropMath, timings\n  ui/\n    CameraUi.kt         ZoomBadge, ShutterButton, overlays, permission screen\n    ResultScreen.kt     enhanced viewer: Original/Enhanced toggle + timings\nassets/models/\n  super-resolution-10.onnx  bundled ESPCN model (see models/README.md)\n```\n\nConceptual pipeline:\n\n```\nlogicalZoom -> physical camera zoom -> crop -> SR -> reconstructed image\n```\n\n`ZoomController` distinguishes `logicalZoom` (UI) from `physicalZoom`\n(CameraX): logical zoom may exceed the physical maximum by up to 8x\n(capped at 64x) — the headroom is \"reconstruction zoom\", cropped tighter\nthan the preview and restored by SR. The badge turns amber with an \"SR\" tag\npast the hardware limit. Pinch gain grows gently with zoom so traversing\nhigh magnifications doesn't feel like wading (unity at 1x, capped).\n`ReconstructionState` carries `reconstructionLevel`.\n\n## Super-resolution pipeline\n\n1. Shutter → `ImageCapture` still frame saved as JPEG → decoded to Bitmap\n   (file-based capture; EXIF-oriented upright, OOM-safe downsample retry).\n2. The frame is pre-cropped to the screen aspect (WYSIWYG: the preview\n   center-crops to the display), then center-cropped by the *extra* digital\n   portion only — `logical / physical` — because CameraX zoom already applies\n   to the captured frame. Stills carry no in-frame zoom, so extra == logical.\n3. The crop is covered with 224×224 tiles at native resolution (aspect",
+    "package_json": null,
+    "package_json_path": null,
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "jobhunter",
+    "root": "/home/penguin/code/jobhunter",
+    "android": false,
+    "docker_compose": true,
+    "package_manager": null,
+    "top_dirs": [
+      "backend",
+      "frontend",
+      "screenshots",
+      "tests",
+      "uploads"
+    ],
+    "manifests": [
+      "package.json",
+      "pnpm-lock.yaml",
+      "pyproject.toml",
+      "requirements.txt",
+      "docker-compose.yml",
+      "Dockerfile"
+    ],
+    "readme_title": "JobHunter — AI job-search & application agent (local-first)",
+    "readme_excerpt": "# JobHunter — AI job-search & application agent (local-first)\n\nProduction-quality local app: discovers real jobs (Greenhouse/Lever/Ashby/RemoteOK/HN public APIs),\nanalyzes fit vs your structured profile, prepares grounded application material, drives a real\nPlaywright browser to fill forms, **stops before Submit for explicit human approval**, and tracks\neverything in PostgreSQL.\n\nLinkedIn/Wellfound are marked **unavailable** (login-gated + anti-bot) — never circumvented.\n\n## Quickstart\n\n```bash\ncp .env.example .env            # add AI_API_KEY (optional; rules engine works without it)\ndocker compose up --build       # db + backend + frontend\n# or local dev:\ncd backend && pip install -r requirements.txt && playwright install chromium\nDATABASE_URL=sqlite:///./jobhunter.db uvicorn app.main:app --reload --port 8000\ncd ../frontend && pnpm install && pnpm dev   # pnpm recommended; plain npm may fail on flaky IPv6 networks\n```\n\nOpen http://localhost:5173 → Profile → upload CV → Jobs → Search → Analyze → Prepare → Applications → Review → Submit.\n\n## First run (spec §28)\n\n1. `docker compose up -d db` (or use sqlite fallback)\n2. Start backend (`uvicorn app.main:app`), frontend (`npm run dev`)\n3. Dashboard → Upload CV → configure preferences (Profile/Settings)\n4. Jobs → Search → normalized jobs appear (deduplicated across sources)\n5. Analyze → match % + eligibility + hard/preferred/inferred split\n6. Prepare → cover letter + recruiter msg + motivation (grounded, editable)\n7. Browser inspect/fill → stops at review → approval screen → submit click only after approval\n8. Confirmation text required — nothing recorded APPLIED without browser evidence\n9. Applications page shows timeline\n\n## CLI\n\n```bash\ncd backend\npython -m app sources\npython -m app search --query \"AI engineer intern\" --location \"\"\npython -m app analyze\npython -m app run   # search + dedup + analyze summary\n```\n\n## Safety\n\n- `AUTOMATIC_SUBMISSION=false` default; `confirm-submit` requires `human_approved=true` + confirmation text + READY_TO_SUBMIT.\n- CAPTCHA/MFA/anti-bot → pause + `human_action_required`, never bypassed.\n- No fabricated qualifications; sensitive unknowns return UNKNOWN / ask human.\n- Rate limits: `MAX_JOBS_PER_RUN`, `MAX_APPLICATIONS_PER_DAY`, `REQUEST_DELAY_SECONDS`, per-source overrides.\n\n## Tests (no real submissions)\n\n```bash\ncd backend && python -m pytest ../tests/test_core.py ../tests/test_db.py -q\npython -m pytest ../tests/test_browser.py -q   # local mock pages only, needs playwright chromium\npython -m pytest ../tests/test_stage2.py -q   # 22 autonomous-pipeline scenarios (fake browser ops)\nAUTONOMOUS_MODE=true python ../tests/demo_autonomous.py  # full §35 chain, REAL browser vs local mock ATS\n```\n",
+    "package_json": {
+      "name": "jobhunter-frontend",
+      "scripts": {
+        "dev": "vite",
+        "build": "tsc -b && vite build",
+        "preview": "vite preview"
+      },
+      "dependencies": [
+        "react",
+        "react-dom",
+        "react-router-dom"
+      ],
+      "devDependencies": [
+        "@types/react",
+        "@types/react-dom",
+        "@vitejs/plugin-react",
+        "autoprefixer",
+        "postcss",
+        "tailwindcss",
+        "typescript",
+        "vite"
+      ],
+      "workspaces": null,
+      "packageManager": null,
+      "type": "module"
+    },
+    "package_json_path": "frontend/package.json",
+    "pyproject": {
+      "scripts": {},
+      "dependencies": [],
+      "frameworks": [],
+      "tooling": []
+    },
+    "pyproject_path": "pyproject.toml",
+    "requirements": {
+      "count": 17,
+      "packages": [
+        "fastapi",
+        "uvicorn",
+        "sqlalchemy",
+        "psycopg",
+        "pydantic",
+        "pydantic-settings",
+        "httpx",
+        "beautifulsoup4",
+        "lxml",
+        "python-multipart",
+        "pypdf",
+        "python-docx",
+        "playwright",
+        "pytest",
+        "pytest-asyncio",
+        "greenlet",
+        "alembic"
+      ]
+    },
+    "requirements_path": "backend/requirements.txt",
+    "compose": {
+      "services": {
+        "db": {
+          "image": "postgres:16",
+          "build": null,
+          "ports": [
+            "5432:5432"
+          ],
+          "depends_on": []
+        },
+        "backend": {
+          "image": null,
+          "build": true,
+          "ports": [
+            "8000:8000"
+          ],
+          "depends_on": []
+        },
+        "frontend": {
+          "image": null,
+          "build": true,
+          "ports": [
+            "5173:80"
+          ],
+          "depends_on": [
+            "backend"
+          ]
+        }
+      },
+      "raw_length": 931
+    },
+    "compose_path": "docker-compose.yml",
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": [
+      "setup.sh"
+    ]
+  },
+  {
+    "name": "microsaas",
+    "root": "/home/penguin/code/microsaas",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [],
+    "manifests": [],
+    "readme_title": null,
+    "readme_excerpt": null,
+    "package_json": null,
+    "package_json_path": null,
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "musicalbook",
+    "root": "/home/penguin/code/musicalbook",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": "npm",
+    "top_dirs": [
+      "content",
+      "public",
+      "scripts",
+      "src",
+      "tools"
+    ],
+    "manifests": [
+      "package.json",
+      "package-lock.json"
+    ],
+    "readme_title": "MusicalBook — an adaptive soundtrack for reading",
+    "readme_excerpt": "# MusicalBook — an adaptive soundtrack for reading\n\nAn experimental web experience testing one idea: **can a dynamically timed,\npre-generated soundtrack make reading fiction more immersive?**\n\nA reader enters their reading speed (WPM), presses start, and reads Poe's\n*The Tell-Tale Heart* while a cinematic score unfolds underneath —\nscene changes land where the reader is *expected* to be, computed from\n`word_position / WPM × 60`. No accounts, no backend, no live AI: the site\nis fully static.\n\n```\nLanding → WPM (+ external speed test ↗) → Begin →\nreading + adaptive soundtrack → feedback (local only)\n```\n\n## Run it\n\n```bash\nnpm install\nnpm run dev        # develop\nnpm run build      # static production build → dist/\nnpm run preview    # serve the production build locally\n```\n\nDeploys as-is to Vercel, Netlify, Cloudflare Pages, or GitHub Pages\n(relative `base: './'` — sub-path hosting works).\n\n## Where things live\n\n| Path | What |\n|---|---|\n| `content/story.json` | The story (structured paragraphs; word count is computed, never hand-entered) |\n| `content/music-plan.json` | Offline musical analysis: 7 narrative scenes, emotion scores, ACE-Step prompts |\n| `content/timeline.json` | Slim runtime timeline **derived** from the plan (`npm run build:timeline`) |\n| `public/audio/` | Soundtrack assets, one per scene (probed `.opus → .mp3 → .m4a → .wav`) |\n| `src/story/` | WPM → timestamp mapping (`buildTimeline`) |\n| `src/audio/` | Playback engine: `AudioEngine.ts`, pure `AudioTimeline.ts`, `crossfade.ts` |\n| `src/components/` | `LandingPage`, `ReadingView`, `FeedbackView` |\n| `src/config.ts` | All tunables: speed-test URL, WPM bounds, crossfade, preload |\n| `tools/music-pipeline/` | Offline creator tooling (LLM prompt, schema, validator) |\n| `scripts/` | `generate-placeholders.mjs`, `verify-timing.mjs` |\n\nThe browser bundles only `story.json` + `timeline.json`. Analysis scores\nand generation prompts never ship to readers.\n\n## How the WPM mechanism works\n\n```\nscene_start_time = start_word / WPM × 60\n```\n\nSame files, any speed: word 761 (the vulture eye opens) lands at 456s for\n100 WPM and 91s for 500 WPM. Each scene bed loops; the next scene starts\nfading in `crossfadeSeconds` (default 8s, auto-clamped to scene length)\nbefore its boundary. Pause freezes the clock *and* the audio together, so\nresume never loses sync. Progress shown is expected-timeline progress —\nthis version deliberately does no scroll tracking or live WPM estimation.\n\nVerify it offline: `npm run verify:timing` (boundary math at 100/200/300/500",
+    "package_json": {
+      "name": "adaptive-soundtrack-reading",
+      "scripts": {
+        "dev": "vite",
+        "build": "tsc -b && vite build",
+        "lint": "oxlint",
+        "preview": "vite preview",
+        "validate:plan": "node tools/music-pipeline/validate.mjs",
+        "build:timeline": "node tools/music-pipeline/build-timeline.mjs",
+        "placeholders": "node scripts/generate-placeholders.mjs",
+        "verify:timing": "node scripts/verify-timing.mjs"
+      },
+      "dependencies": [
+        "react",
+        "react-dom"
+      ],
+      "devDependencies": [
+        "@tailwindcss/vite",
+        "@types/node",
+        "@types/react",
+        "@types/react-dom",
+        "@vitejs/plugin-react",
+        "oxlint",
+        "tailwindcss",
+        "typescript",
+        "vite"
+      ],
+      "workspaces": null,
+      "packageManager": null,
+      "type": "module"
+    },
+    "package_json_path": "package.json",
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "omarchy",
+    "root": "/home/penguin/code/omarchy",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [
+      ".github",
+      "agents",
+      "applications",
+      "bin",
+      "config",
+      "default",
+      "docs",
+      "etc",
+      "install",
+      "manual",
+      "migrations",
+      "plans",
+      "shell",
+      "test",
+      "themes"
+    ],
+    "manifests": [],
+    "readme_title": "Omarchy",
+    "readme_excerpt": "# Omarchy\n\nOmarchy is a beautiful, fun & agentic Linux distribution by DHH.\n\nRead more at [omarchy.org](https://omarchy.org).\n\n## The Omarchy Manual\n\nThe manual lives in [`manual/`](manual/), which is its authoritative source. It's\nmirrored to [learn.omacom.io](https://learn.omacom.io/2/the-omarchy-manual), where\nits screenshots are also hosted.\n\n- [Welcome to Omarchy!](manual/01-welcome-to-omarchy.md)\n\n**The Basics**\n\n- [Getting Started](manual/02-getting-started.md)\n- [Coming From Mac or Windows](manual/03-coming-from-mac-or-windows.md)\n- [Navigation](manual/04-navigation.md)\n- [The top bar](manual/05-the-top-bar.md)\n- [Themes](manual/06-themes.md)\n- [Hotkeys](manual/07-hotkeys.md)\n- [Unified Clipboard & History](manual/08-unified-clipboard-history.md)\n- [Reminders](manual/09-reminders.md)\n- [Notices](manual/10-notices.md)\n- [Text Extraction & Dictation](manual/11-text-extraction-dictation.md)\n- [Screenshots & Recording](manual/12-screenshots-recording.md)\n- [Toggles, idle & screensaver](manual/13-toggles-idle-screensaver.md)\n- [Omarchy CLI](manual/14-omarchy-cli.md)\n\n**The Applications**\n\n- [Terminal](manual/15-terminal.md)\n- [Neovim](manual/16-neovim.md)\n- [AI](manual/17-ai.md)\n- [Development Tools](manual/18-development-tools.md)\n- [Shell Tools](manual/19-shell-tools.md)\n- [Shell Functions](manual/20-shell-functions.md)\n- [TUIs](manual/21-tuis.md)\n- [GUIs](manual/22-guis.md)\n- [Browsers](manual/23-browsers.md)\n- [Commercial apps/services](manual/24-commercial-apps-services.md)\n- [Web Apps](manual/25-web-apps.md)\n- [Gaming](manual/26-gaming.md)\n- [Filling out PDFs](manual/27-filling-out-pdfs.md)\n- [Windows VM](manual/28-windows-vm.md)\n- [Other Packages](manual/29-other-packages.md)\n\n**Configuration**\n\n- [Updates](manual/30-updates.md)\n- [Dotfiles](manual/31-dotfiles.md)\n- [Shell plugins](manual/32-shell-plugins.md)\n- [Monitors](manual/33-monitors.md)\n- [Keyboard, Mouse, Trackpad](manual/34-keyboard-mouse-trackpad.md)\n- [Networking](manual/35-networking.md)\n- [System sleep](manual/36-system-sleep.md)\n- [Hardware authentication](manual/37-hardware-authentication.md)\n- [Fonts](manual/38-fonts.md)\n- [Backgrounds](manual/39-backgrounds.md)",
+    "package_json": null,
+    "package_json_path": null,
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "phoneaway",
+    "root": "/home/penguin/code/phoneaway",
+    "android": true,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [
+      "app",
+      "gradle"
+    ],
+    "manifests": [
+      "build.gradle.kts",
+      "settings.gradle.kts",
+      "gradlew"
+    ],
+    "readme_title": "PhoneAway — Android screen-distance coach",
+    "readme_excerpt": "# PhoneAway — Android screen-distance coach\n\nPhoneAway is a small, privacy-first Android utility. While monitoring is enabled, it briefly opens the front camera at a configurable interval, checks whether a face is approximately facing the screen, estimates viewing distance, updates a persistent notification, and gives one short vibration after a sustained too-close episode.\n\n> Camera frames are processed locally and are not stored or transmitted.\n\nThis is an ergonomic reminder, not a measuring instrument or medical advice.\n\n## Platform/UX decision\n\nA normal Android app cannot draw into or recolor an arbitrary area of the system status bar. Android also requires notification small icons to be alpha-only and System UI applies its own tint, so a genuinely multicoloured status-bar glyph is prohibited. PhoneAway uses the closest native alternative: an ongoing low-importance foreground-service notification whose title always includes an explicit 🟢/🟡/🔴/⚪ state symbol and whose full-colour large circle icon is regenerated whenever state changes. The compact status-bar glyph remains intentionally monochrome. No overlay permission is requested.\n\nModern Android also forbids ordinary background camera use. Monitoring runs as a user-started **camera foreground service**, declared with `foregroundServiceType=\"camera\"`, and displays an ongoing notification. On Android 14+, a camera foreground service must be started while the app is visible (the app does this when the switch is enabled); it cannot silently restart from boot or be created later from the background. If Android kills it, monitoring remains stopped until the user opens PhoneAway and starts it again. Android's green camera privacy indicator appears during each sample and cannot/should not be bypassed.\n\nAndroid 13+ notification permission is requested alongside camera permission. A denied notification permission does not exempt the app from foreground-service rules (the service still appears in system task management), but it makes the status experience poor; grant it for the intended indicator. Camera permission is always required. Persistent notifications may still be exposed to user/OEM controls.\n\n## Architecture\n\n- `monitoring/MonitoringService`: user-started foreground service, screen-on scheduling, lifecycle/error handling.\n- `monitoring/CameraSampler`: CameraX 640×480 short bursts; requires three consistent detections, then immediately unbinds/releases camera.\n- `vision/`: ML Kit on-device face geometry, coarse looking heuristic, pinhole estimate, median smoothing, hysteretic classifier.\n- `notifications/`: ongoing minimal status notification.\n- `haptics/`: sustained-episode and cooldown gate.\n- `settings/`: Preferences DataStore.\n- `state/`: small in-process diagnostic/current-state store.\n- Compose UI: onboarding, controls, state, and hidden debug panel (tap the **Screen Distance** title).\n\nNo network permission, analytics SDK, account, server, image capture, recognition, or identity tracking is included.\n\n## Distance estimate\n\nThe estimator uses the pinhole relationship:\n\n`distance ≈ focalLengthPixels × assumedFaceWidth / detectedFaceWidthPixels`\n\nIt converts Camera2 active-array/physical sensor dimensions and focal length into pixel focal lengths after accounting for sensor and CameraX aspect-ratio crops. Width and height estimates are combined when geometrically consistent, with more weight on the steadier width measurement; moderate head pose is projection-compensated. Each check discards two exposure-settling frames, rejects clipped, tiny, oddly proportioned, off-axis faces, and requires three distance measurements agreeing within 12%. A conservative 65° fallback is used when metadata is unavailable. It assumes a 14 cm face width and 19 cm face height, then applies a conservative empirical scale because ML Kit's face box commonly spans less than the assumed physical dimensions. Faces, lenses, detector boxes, and camera metadata differ, so displayed centimeters are approximate. Classification reliability—not physical precision—is the goal.\n\nFor device/user calibration, select a preferred distance, physically hold the phone at that measured distance, wait for a stable reading, and press **Calibrate at … cm**. This stores a local multiplicative scale factor; no image or biometric data is retained. Calibration should be performed looking straight at the camera in good light.\n\n\"Looking\" means a face is found, centered reasonably, and within ±25° yaw/pitch. It is not eye-gaze tracking. `NO_FACE`/`NOT_LOOKING` never warns.\n\n## State stability and haptics\n\nFive recent valid estimates are median-filtered and lightly exponentially smoothed. The selected preferred distance (25 cm by default, adjustable from 25–60 cm) is the warning boundary; recovery requires 4 cm more distance. Sensitivity controls the yellow approach band. A too-close episode must persist for 3 seconds before a 120 ms vibration. It warns only once until recovery, with a configurable persisted cooldown (120 seconds by default).\n\nBecause the default sample interval is 15 seconds and each sample releases the camera after one analyzed frame, a 3-second sustained condition is practically confirmed by subsequent periodic samples. This intentionally favors low battery use over immediate warnings.\n\n## Battery strategy\n\n- One short low-resolution burst per selectable 3, 5, 10, 15, 20, 25, or 30 second interval (15 seconds default); two exposure-settling frames are discarded and three consistent detections are required.\n- Camera unbound immediately after a stable result (at most eight frames); no preview, recording, bitmap retention, wake lock, or continuous stream.\n- No samples while the screen is off (`PowerManager.isInteractive`).\n- Fast-mode on-device ML Kit detector.\n- Debug-only structured Logcat timings; hidden UI reports samples and average inference time.\n\n## Build\n\nRequirements: Android SDK 34, JDK 17, and Gradle 8.7. This repository includes the Gradle wrapper after bootstrap.\n\n```bash",
+    "package_json": null,
+    "package_json_path": null,
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "polymarket",
+    "root": "/home/penguin/code/polymarket",
+    "android": false,
+    "docker_compose": true,
+    "package_manager": null,
+    "top_dirs": [
+      "alembic",
+      "backend",
+      "docs",
+      "frontend",
+      "logs",
+      "scripts",
+      "tests"
+    ],
+    "manifests": [
+      "package.json",
+      "package-lock.json",
+      "requirements.txt",
+      "docker-compose.yml",
+      "Dockerfile"
+    ],
+    "readme_title": "Polymarket Paper-Trading Research Lab (24/7 autonomous experiment)",
+    "readme_excerpt": "# Polymarket Paper-Trading Research Lab (24/7 autonomous experiment)\n\nThree independent $10k paper portfolios — COPY (mirror scored traders), AGENT\n(own fair-value predictions), BENCHMARK (RANDOM + FAVORITE controls) — sharing\ninfrastructure but never capital. Paper only: no keys, no signing, no submissions.\n\n## Run (unattended)\n\n```bash\ncp .env.example .env   # MOCK_MODE=false is the production default\n./start.sh              # docker compose up -d --build (localhost only)\n./start.sh --tunnel     # + explicit public tunnel (no auth — your call)\n./status.sh             # services + portfolios + heartbeat\n./stop.sh / ./restart.sh\n```\n\nDashboard http://localhost:5173 · API http://localhost:8000 · health\n`/health/detailed`, `/api/system/heartbeat`.\n\n## CLI (§48)\n\n```\npython -m scripts.discover_traders [--target 500]\npython -m scripts.score_traders [--limit 200]\npython -m scripts.inspect_trader WALLET\npython -m scripts.run_agent            # agent worker loop\npython -m scripts.run_copy_monitor     # copy worker loop\npython -m scripts.benchmark --loop\npython -m scripts.resolve_markets [--loop]\npython -m scripts.generate_report      # daily report + docs/performance/YYYY-MM-DD.md\npython -m scripts.verify_pipeline      # 20 end-to-end checks, exits nonzero on FAIL\npython -m scripts.daily_summary\n```\n\n## Key API (§44)\n\n`/api/research/summary` `/api/portfolios[/{id}]` `/api/traders/discovered|qualified|followed`\n`/api/traders/{address}` `/api/agent/predictions` `/api/trades` `/api/positions`\n`/api/performance` `/api/calibration` `/api/strategies` `/api/ledger`\n`/api/system/health` `/api/system/heartbeat` — all paginated.\n\n## Experiment reading order\n\ndocs/current-state-audit.md → docs/architecture.md → docs/trader-scoring.md →\ndocs/copy-strategy.md → docs/agent-strategy.md → docs/paper-execution.md →\ndocs/profitability-evaluation.md → docs/data-quality.md → docs/operations.md\n\n## Tests\n\n`pytest` (43+ tests: scoring, execution, fees, filters, portfolio PnL,\nresolution, autofollow, live shapes, strategies, qualification, evaluation,\npagination, heartbeat). No network required except live-smoke scripts.\n",
+    "package_json": {
+      "name": "polymarket-dashboard",
+      "scripts": {
+        "dev": "vite --host 0.0.0.0 --port 5173",
+        "build": "tsc -b && vite build",
+        "preview": "vite preview --host 0.0.0.0 --port 5173"
+      },
+      "dependencies": [
+        "react",
+        "react-dom"
+      ],
+      "devDependencies": [
+        "@types/react",
+        "@types/react-dom",
+        "@vitejs/plugin-react",
+        "autoprefixer",
+        "postcss",
+        "tailwindcss",
+        "typescript",
+        "vite"
+      ],
+      "workspaces": null,
+      "packageManager": null,
+      "type": "module"
+    },
+    "package_json_path": "frontend/package.json",
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": {
+      "count": 11,
+      "packages": [
+        "fastapi",
+        "uvicorn",
+        "sqlalchemy",
+        "alembic",
+        "psycopg",
+        "pydantic",
+        "pydantic-settings",
+        "httpx",
+        "python-dateutil",
+        "pytest",
+        "pytest-asyncio"
+      ]
+    },
+    "requirements_path": "backend/requirements.txt",
+    "compose": {
+      "services": {
+        "postgres": {
+          "image": "postgres:16-alpine",
+          "build": null,
+          "ports": [],
+          "depends_on": []
+        },
+        "backend": {
+          "image": null,
+          "build": true,
+          "ports": [],
+          "depends_on": []
+        },
+        "copy_worker": {
+          "image": null,
+          "build": true,
+          "ports": [],
+          "depends_on": []
+        },
+        "agent_worker": {
+          "image": null,
+          "build": true,
+          "ports": [],
+          "depends_on": []
+        },
+        "benchmark_worker": {
+          "image": null,
+          "build": true,
+          "ports": [],
+          "depends_on": []
+        },
+        "resolution_worker": {
+          "image": null,
+          "build": true,
+          "ports": [],
+          "depends_on": []
+        },
+        "frontend": {
+          "image": null,
+          "build": true,
+          "ports": [],
+          "depends_on": [
+            "backend"
+          ]
+        }
+      },
+      "raw_length": 2809
+    },
+    "compose_path": "docker-compose.yml",
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": [
+      "restart.sh",
+      "start.sh",
+      "status.sh",
+      "stop.sh"
+    ]
+  },
+  {
+    "name": "prospectpilot",
+    "root": "/home/penguin/code/prospectpilot",
+    "android": false,
+    "docker_compose": true,
+    "package_manager": null,
+    "top_dirs": [
+      "backend",
+      "frontend"
+    ],
+    "manifests": [
+      "requirements.txt",
+      "docker-compose.yml",
+      "Dockerfile"
+    ],
+    "readme_title": "ProspectPilot — AI-powered B2B prospect research & outreach-prep MVP",
+    "readme_excerpt": "# ProspectPilot — AI-powered B2B prospect research & outreach-prep MVP\n\nResearch agent: describe the businesses you want → discover candidates from\npublic web sources → research their public websites → extract **publicly\ndisplayed** business contacts (with source URLs + confidence/status) →\nqualify against your explicit criteria → draft personalized outreach.\n\n**Boundaries (by design):** research + drafts only. No bulk messaging, no\nauto-sending. Every draft needs explicit approval, and approval only marks it\n`approved_for_sending` — sending is not implemented.\n\n## Architecture\n\n```\ncampaign brief → CampaignPlanner → DiscoveryAgent (SearchProvider)\n  → WebsiteResearchAgent (HTTP + robots.txt + rate limits; Playwright only if needed)\n  → ContactExtractionAgent (deterministic regex first, never guesses emails)\n  → QualificationAgent (scores ONLY on explicit criteria + stored evidence)\n  → OutreachAgent (drafts, every claim traceable to evidence)\n```\n\n- `backend/app/agents/` — the six workers above\n- `backend/app/providers/` — `SearchProvider` (mock / configurable API),\n  `LLMProvider` (mock / OpenAI-compatible via `AI_*`), website fetch+extract\n- `backend/app/services/pipeline.py` — async orchestration (idempotent,\n  per-item try/except, cancellation, progress counts)\n- `backend/app/workers/` — Redis+RQ when `REDIS_URL` is set, else inline\n  background threads (same API)\n- DB: PostgreSQL via `DATABASE_URL` (SQLite default for local/demo);\n  SQLAlchemy models with UUID PKs: campaigns, prospects, contacts,\n  research_records, research_evidence, outreach_drafts, suppression_records, agent_runs\n- UI: server-rendered dashboard (`/campaigns`, `/campaigns/new`,\n  `/campaigns/[id]`, `/prospects/[id]`) + JSON API + `frontend/` static mirror\n\n## Installation\n\n```bash\ncd prospectpilot\ncp .env.example .env\ncd backend\npython -m venv .venv && source .venv/bin/activate\npip install -r requirements.txt\n```\n\n## Environment variables\n\n| Var | Meaning | Default |\n|---|---|---|\n| `DATABASE_URL` | SQLAlchemy URL (PG in prod, SQLite locally) | `sqlite:///./prospectpilot.db` |\n| `REDIS_URL` | empty = inline threads; set = Redis+RQ | empty |\n| `SEARCH_PROVIDER` | `mock` \\| `configurable_api` | `mock` |\n| `SEARCH_API_URL` / `SEARCH_API_KEY` / `SEARCH_API_MODE` | your search API (`serper`/`tavily`/`brave`/`generic`) | empty |\n| `AI_PROVIDER` | `mock` \\| `openai_compatible` | `mock` |\n| `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` | any OpenAI-compatible endpoint | `gpt-4o-mini` |\n| `RESPECT_ROBOTS_TXT`, `RATE_LIMIT_PER_DOMAIN_SEC`, `FETCH_TIMEOUT` | politeness | true / 1.0 / 15 |\n| `DEMO_MODE` | show demo hints in UI | true |\n\nNever commit `.env`. API keys never reach the frontend.\n\n## Database / Redis setup",
+    "package_json": null,
+    "package_json_path": null,
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": {
+      "count": 13,
+      "packages": [
+        "fastapi",
+        "uvicorn",
+        "sqlalchemy",
+        "pydantic",
+        "pydantic-settings",
+        "jinja2",
+        "httpx",
+        "python-multipart",
+        "psycopg2-binary",
+        "redis",
+        "rq",
+        "pytest",
+        "pytest-asyncio"
+      ]
+    },
+    "requirements_path": "backend/requirements.txt",
+    "compose": {
+      "services": {
+        "db": {
+          "image": "postgres:16",
+          "build": null,
+          "ports": [
+            "5432:5432"
+          ],
+          "depends_on": []
+        },
+        "redis": {
+          "image": "redis:7",
+          "build": null,
+          "ports": [
+            "6379:6379"
+          ],
+          "depends_on": []
+        },
+        "backend": {
+          "image": null,
+          "build": true,
+          "ports": [
+            "8000:8000"
+          ],
+          "depends_on": [
+            "db"
+          ]
+        },
+        "worker": {
+          "image": null,
+          "build": true,
+          "ports": [],
+          "depends_on": [
+            "db"
+          ]
+        }
+      },
+      "raw_length": 916
+    },
+    "compose_path": "docker-compose.yml",
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "restaurantbills",
+    "root": "/home/penguin/code/restaurantbills",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [
+      "backend",
+      "data",
+      "frontend",
+      "tests"
+    ],
+    "manifests": [
+      "package.json",
+      "package-lock.json",
+      "requirements.txt"
+    ],
+    "readme_title": "Restaurant Revenue Recovery Auditor v0.1",
+    "readme_excerpt": "# Restaurant Revenue Recovery Auditor v0.1\n\n\"We find money that may be incorrectly deducted from your Swiggy/Zomato payouts, explain why, prepare the evidence, and help you recover it.\"\n\nLocal MVP. Deterministic arithmetic; neutral language (flags are \"requires verification\", never accusations).\n\n## Fixtures (synthetic dev data — NOT authentic merchant files)\n- `data/swiggy_public_schema_fixture.csv`\n- `data/zomato_public_schema_fixture.csv`\n\nGenerated by `data/gen_fixtures.py`.\n\n## Quickstart\n\nBackend (FastAPI :8000):\n```\npython3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt\n.venv/bin/python -m backend.seed --reset\n.venv/bin/python -m uvicorn backend.main:app --port 8000\n```\n\nFrontend (Next.js :3000):\n```\ncd frontend && npm install && npm run dev\n```\n\nOpen http://localhost:3000 → upload a fixture (or browse seeded batches) → open a batch → click an issue/order → Export audit report.\n\n## Tests\n```\n.venv/bin/python -m pytest backend/tests -q\n```\n\n## Architecture\n- `backend/parsers/` — SwiggyParser / ZomatoParser → canonical schema (+ raw row preserved as JSON)\n- `backend/reconciliation/engine.py` — deterministic expected-payout arithmetic\n- `backend/rules/engine.py` — anomaly rules A–F (unknown fee, promo, commission, cancellation, duplicate, variance)\n- `backend/reports/builder.py` — CSV + HTML audit report\n- `frontend/app/` — upload+config home, batch dashboard, order detail with \"Why was this flagged?\" evidence\n",
+    "package_json": {
+      "name": "revenue-recovery-auditor",
+      "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start"
+      },
+      "dependencies": [
+        "next",
+        "react",
+        "react-dom"
+      ],
+      "devDependencies": [
+        "@types/node",
+        "@types/react",
+        "autoprefixer",
+        "postcss",
+        "tailwindcss",
+        "typescript"
+      ],
+      "workspaces": null,
+      "packageManager": null
+    },
+    "package_json_path": "frontend/package.json",
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": {
+      "count": 10,
+      "packages": [
+        "fastapi",
+        "uvicorn",
+        "pandas",
+        "openpyxl",
+        "xlrd",
+        "sqlalchemy",
+        "pydantic",
+        "python-multipart",
+        "pytest",
+        "httpx"
+      ]
+    },
+    "requirements_path": "backend/requirements.txt",
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "rune",
+    "root": "/home/penguin/code/rune",
+    "android": true,
+    "docker_compose": false,
+    "package_manager": null,
+    "top_dirs": [
+      "app",
+      "core",
+      "docs",
+      "feature",
+      "gradle",
+      "source"
+    ],
+    "manifests": [
+      "build.gradle.kts",
+      "settings.gradle.kts",
+      "gradlew"
+    ],
+    "readme_title": "RUNE — open-web lossless music discovery & streaming for Android",
+    "readme_excerpt": "# RUNE — open-web lossless music discovery & streaming for Android\n\nRune is an open-source online lossless music discovery and streaming client.\nThe core loop:\n\n**Search the open music web → inspect source/license/audio quality → stream FLAC directly → nothing stored.**\n\nIt looks like a riced Linux music app that escaped into Android: near-black OLED\nsurfaces, monospace instrumentation readouts (`FLAC · 24 BIT · 96 KHZ`), sharp\ncorners, dense information. It does not look like Spotify.\n\n> **Status: online-first MVP.** Federated search across Internet Archive,\n> Jamendo, Openverse, Wikimedia Commons (+ Funkwhale instances, VK explicitly\n> UNSUPPORTED), progressive results with filters, per-track stream picker,\n> direct Media3 streaming with bounded cache, source fallback, favorites /\n> playlists / history as metadata only. Local library code is retained but\n> deprioritized as a workflow.\n\n## Product principle\n\nRune is **not** a piracy application, **not** a local player, **not** a\ndownloader. Remote sources are used through official/public/authorized\ninterfaces only:\n\n- source URL, provider, license, attribution and rights metadata are preserved\n- unknown rights render as **UNKNOWN LICENSE**, never as \"free\"\n- Creative Commons variants are distinguished, never collapsed to \"FREE\"\n- no DRM/auth/rate-limit/geo circumvention, no scrapers for protected content\n- providers without an authorized path (VK) are marked **UNSUPPORTED**\n\n## Features\n\n- Federated search: concurrent per-source queries with timeout, cancellation,\n  error isolation, progressive merge, per-source status\n- Result grouping (conservative dedup), relevance/quality ranking, inline\n  filters (format, license, source, min sample rate) + sorting\n- Track screen with AVAILABLE STREAMS picker, provenance, license, source page\n- Direct streaming via ExoPlayer (range requests/buffering, no pre-download),\n  bounded LRU stream cache (off/128M–1G), CONNECTING/BUFFERING/PLAYING states\n- Source fallback: manual \"TRY ANOTHER SOURCE\" + optional auto-fallback;\n  queue items resolve alternates for the same logical track\n- Home search hero, sources health, Library = playlists/favorites/history\n  (metadata references only — \"SOURCE NO LONGER AVAILABLE\", never silent loss)\n- Media3 service: background, MediaSession, notification, lock-screen,\n  headset/Bluetooth, audio focus, noisy-event pause\n- Jamendo client id via BuildConfig/gradle property/env or Settings override —\n  never in source control\n\n## Architecture\n\n```\nSearchScreen → SearchViewModel → FederatedSearchManager → MusicSources (set)\nTrackScreen  → RemoteTrackResolver → adapter.getAudioSources (detail only)\nPlayerManager → MediaController → RunePlaybackService (ExoPlayer + SimpleCache)\nRoom: remote_tracks, search_history, playlists, favorites, play_history…\n```\n\n- UI never touches source APIs; every source implements `MusicSource`.\n- The DB is a metadata index: tracks/albums/artists facts, licenses, artwork\n  URLs, favorites, history, playlists, search history. Never audio.",
+    "package_json": null,
+    "package_json_path": null,
+    "pyproject": null,
+    "pyproject_path": null,
+    "requirements": null,
+    "requirements_path": null,
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  },
+  {
+    "name": "vercel",
+    "root": "/home/penguin/code/vercel",
+    "android": false,
+    "docker_compose": false,
+    "package_manager": "pnpm",
+    "top_dirs": [
+      ".changeset",
+      ".claude",
+      ".github",
+      ".husky",
+      "api",
+      "crates",
+      "errors",
+      "examples",
+      "internals",
+      "packages",
+      "python",
+      "scripts",
+      "skills",
+      "test",
+      "utils"
+    ],
+    "manifests": [
+      "package.json",
+      "pnpm-lock.yaml",
+      "package-lock.json",
+      "yarn.lock",
+      "pyproject.toml",
+      "requirements.txt",
+      "uv.lock",
+      "Dockerfile",
+      "Cargo.toml",
+      "go.mod",
+      "Gemfile"
+    ],
+    "readme_title": null,
+    "readme_excerpt": "<p align=\"center\">\n  <a href=\"https://vercel.com\">\n    <img src=\"https://assets.vercel.com/image/upload/v1588805858/repositories/vercel/logo.png\" height=\"96\">\n    <h3 align=\"center\">Vercel</h3>\n  </a>\n</p>\n\n<p align=\"center\">\n  Develop. Preview. Ship.\n</p>\n\n<p align=\"center\">\n  <a href=\"https://vercel.com/docs\"><strong>Documentation</strong></a> ·\n  <a href=\"https://vercel.com/changelog\"><strong>Changelog</strong></a> ·\n  <a href=\"https://vercel.com/templates\"><strong>Templates</strong></a> ·\n  <a href=\"https://vercel.com/docs/cli\"><strong>CLI</strong></a>\n</p>\n<br/>\n\n## Vercel\n\nVercel’s AI Cloud is a unified platform for building modern applications, giving teams the tools to be flexible, move fast, and stay secure while focusing on their products instead of infrastructure.\n\n## Deploy\n\nGet started by [importing a project](https://vercel.com/new), [choosing a template](https://vercel.com/templates), or using the [Vercel CLI](https://vercel.com/docs/cli). Then, `git push` to deploy.\n\n## Native CLI binaries\n\nThe standard npm installation remains unchanged:\n\n```bash\nnpm i -g vercel\n```\n\nNative CLI binaries are distributed separately and do not affect the `vercel` npm package. To opt into the native binary and replace existing global `vercel` and `vc` commands, install the native package explicitly:\n\n```bash\nnpm i -g @vercel/vc-native --force\n```\n\nThe `--force` flag allows npm to replace existing global `vercel` and `vc` bin links. Users who do not install `@vercel/vc-native` continue using the regular Node.js-based CLI from `npm i -g vercel`.\n\nPlatform-specific packages are also available for direct installation when a specific binary is needed:\n\n```bash\nnpm i -g @vercel/vc-native-darwin-x64 --force\n```\n\n## Documentation\n\nFor details on how to use Vercel, check out our [documentation](https://vercel.com/docs).\n\n## Contributing\n\nThis project uses [pnpm](https://pnpm.io/) to install dependencies and run scripts.\n\nYou can use the `vercel` script to run local changes as if you were invoking Vercel CLI. For example, `vercel deploy --cwd=/path/to/project` could be run with local changes with `pnpm vercel deploy --cwd=/path/to/project`.\n\nWhen contributing to this repository, please first discuss the change you wish to make via [Vercel Community](https://community.vercel.com/tags/c/community/4/cli) with the owners of this repository before submitting a Pull Request.",
+    "package_json": {
+      "name": "vercel-monorepo",
+      "scripts": {
+        "build": "turbo --no-update-notifier run build:package build:docs",
+        "vercel-build": "pnpm build && pnpm run pack && cd api && node -r ts-eager/register ./_lib/script/build.ts",
+        "pre-commit": "lint-staged",
+        "test": "vitest run --config vitest.config.mts --dir test",
+        "test-unit": "vitest run --config vitest.config.mts --dir test && turbo --no-update-notifier run test-unit",
+        "test-e2e": "turbo --no-update-notifier run test-e2e",
+        "test-dev": "turbo --no-update-notifier run test-dev",
+        "build-binary-node": "node packages/cli/scripts/build-binary-node.mjs",
+        "lint": "biome lint api internals packages test utils",
+        "format": "biome format --write api internals packages test utils",
+        "format:check": "biome format api internals packages test utils",
+        "lint:dependencies": "syncpack lint",
+        "prepare": "husky install",
+        "pack": "cd utils && node -r ts-eager/register ./pack.ts",
+        "ci:version": "changeset version && node utils/sync-python-version.js && uv lock && pnpm install --no-frozen-lockfile",
+        "ci:publish": "node utils/inject-native-optional-deps.mjs && node utils/publish-runtimes.mjs && bash utils/npm-publish.sh && changeset tag",
+        "ci:version:canary": "node utils/changeset-version-canary.js && pnpm install --no-frozen-lockfile",
+        "ci:publish:canary": "bash utils/npm-publish.sh canary",
+        "type-check": "turbo type-check --concurrency=12 --output-logs=errors-only --summarize --continue"
+      },
+      "dependencies": [],
+      "devDependencies": [
+        "@biomejs/biome",
+        "@changesets/cli",
+        "@neondatabase/serverless",
+        "@svitejs/changesets-changelog-github-compact",
+        "@types/node",
+        "@vercel/build-utils",
+        "@vercel/style-guide",
+        "async-retry",
+        "buffer-replace",
+        "create-svelte",
+        "dd-trace",
+        "dot",
+        "esbuild",
+        "execa",
+        "fs-extra",
+        "glob",
+        "husky",
+        "is-ci",
+        "json5",
+        "lint-staged",
+        "ms",
+        "node-fetch",
+        "npm-package-arg",
+        "prettier",
+        "source-map-support",
+        "syncpack",
+        "tmp-promise",
+        "ts-eager",
+        "turbo",
+        "typescript",
+        "vite",
+        "vitest",
+        "ws"
+      ],
+      "workspaces": null,
+      "packageManager": "pnpm@10.29.3"
+    },
+    "package_json_path": "package.json",
+    "pyproject": {
+      "scripts": {},
+      "dependencies": [],
+      "frameworks": [],
+      "tooling": [
+        "uv"
+      ]
+    },
+    "pyproject_path": "pyproject.toml",
+    "requirements": {
+      "count": 3,
+      "packages": [
+        "python-fasthtml",
+        "sqlite_minutils",
+        "uvicorn"
+      ]
+    },
+    "requirements_path": "examples/fasthtml/requirements.txt",
+    "compose": null,
+    "compose_path": null,
+    "makefile": null,
+    "procfile": null,
+    "shell_scripts": []
+  }
+]

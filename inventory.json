@@ -1,0 +1,1066 @@
+{
+  "corpus": "/home/penguin/code",
+  "scanned_at": "2026-09-19T17:59:54.023Z",
+  "count": 24,
+  "projects": [
+    {
+      "name": "agentdock",
+      "path": "/home/penguin/code/agentdock",
+      "is_git": false,
+      "top_files": [
+        ".gitignore",
+        "BUILD_REPORT.md",
+        "README.md",
+        "docker-compose.yml",
+        "package.json",
+        "tsconfig.base.json",
+        "tsconfig.json"
+      ],
+      "top_dirs": [
+        "apps",
+        "data",
+        "docker",
+        "docs",
+        "packages",
+        "scripts",
+        "tests",
+        "workers"
+      ],
+      "manifests": [
+        "package.json",
+        "docker-compose.yml",
+        "Dockerfile"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [
+        "javascript",
+        "shell"
+      ],
+      "package_manager": null,
+      "docker_compose": true,
+      "dockerfile": true,
+      "android": false,
+      "docs_only": false,
+      "kinds": [
+        "docker-compose"
+      ]
+    },
+    {
+      "name": "blindfold-chess",
+      "path": "/home/penguin/code/blindfold-chess",
+      "is_git": false,
+      "top_files": [
+        "README.md",
+        "build.gradle",
+        "gradle.properties",
+        "settings.gradle"
+      ],
+      "top_dirs": [
+        "app",
+        "scripts"
+      ],
+      "manifests": [
+        "build.gradle",
+        "settings.gradle"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [
+        "shell"
+      ],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": true,
+      "docs_only": false,
+      "kinds": [
+        "android"
+      ]
+    },
+    {
+      "name": "book-copilot",
+      "path": "/home/penguin/code/book-copilot",
+      "is_git": false,
+      "top_files": [
+        ".env",
+        ".env.example",
+        ".gitignore",
+        "README.md",
+        "docker-compose.yml"
+      ],
+      "top_dirs": [
+        "apps",
+        "data",
+        "packages",
+        "scripts"
+      ],
+      "manifests": [
+        "package.json",
+        "package-lock.json",
+        "requirements.txt",
+        "docker-compose.yml",
+        "Dockerfile"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [
+        ".env",
+        ".env.example"
+      ],
+      "shell_scripts": [],
+      "languages": [
+        "shell"
+      ],
+      "package_manager": null,
+      "docker_compose": true,
+      "dockerfile": true,
+      "android": false,
+      "docs_only": false,
+      "kinds": [
+        "docker-compose"
+      ]
+    },
+    {
+      "name": "bullet_engine",
+      "path": "/home/penguin/code/bullet_engine",
+      "is_git": false,
+      "top_files": [
+        ".gitignore",
+        "README.md",
+        "pyproject.toml",
+        "requirements.txt"
+      ],
+      "top_dirs": [
+        "bin",
+        "bullet_engine",
+        "config",
+        "logs",
+        "positions",
+        "sample_games",
+        "scripts",
+        "server",
+        "tests",
+        "web",
+        "web_src"
+      ],
+      "manifests": [
+        "package.json",
+        "package-lock.json",
+        "pyproject.toml",
+        "requirements.txt"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [
+        "python"
+      ],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    },
+    {
+      "name": "camera-copilot",
+      "path": "/home/penguin/code/camera-copilot",
+      "is_git": false,
+      "top_files": [
+        "build.gradle.kts",
+        "gradle.properties",
+        "gradlew",
+        "gradlew.bat",
+        "settings.gradle.kts"
+      ],
+      "top_dirs": [
+        "app",
+        "gradle"
+      ],
+      "manifests": [
+        "build.gradle.kts",
+        "settings.gradle.kts",
+        "gradlew"
+      ],
+      "readme": false,
+      "readme_files": [],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": true,
+      "docs_only": false,
+      "kinds": [
+        "android"
+      ]
+    },
+    {
+      "name": "clash",
+      "path": "/home/penguin/code/clash",
+      "is_git": false,
+      "top_files": [
+        ".env.example",
+        ".gitignore",
+        "README.md",
+        "next-env.d.ts",
+        "next.config.js",
+        "package-lock.json",
+        "package.json",
+        "postcss.config.js",
+        "tailwind.config.js",
+        "tsconfig.json",
+        "tsconfig.tsbuildinfo"
+      ],
+      "top_dirs": [
+        "app",
+        "components",
+        "data",
+        "lib",
+        "scripts",
+        "tests",
+        "types"
+      ],
+      "manifests": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [
+        ".env.example"
+      ],
+      "shell_scripts": [],
+      "languages": [
+        "typescript",
+        "javascript"
+      ],
+      "package_manager": "npm",
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    },
+    {
+      "name": "desktop-tutor",
+      "path": "/home/penguin/code/desktop-tutor",
+      "is_git": false,
+      "top_files": [
+        ".env.example",
+        "requirements.txt"
+      ],
+      "top_dirs": [
+        "desktop_tutor",
+        "scripts",
+        "tests"
+      ],
+      "manifests": [
+        "requirements.txt"
+      ],
+      "readme": false,
+      "readme_files": [],
+      "env_files": [
+        ".env.example"
+      ],
+      "shell_scripts": [],
+      "languages": [
+        "python"
+      ],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    },
+    {
+      "name": "freedom",
+      "path": "/home/penguin/code/freedom",
+      "is_git": false,
+      "top_files": [],
+      "top_dirs": [
+        ".opencode",
+        "findings",
+        "recon",
+        "targets",
+        "tools"
+      ],
+      "manifests": [
+        "package.json",
+        "pnpm-lock.yaml",
+        "package-lock.json",
+        "requirements.txt",
+        "Cargo.toml",
+        "Makefile"
+      ],
+      "readme": false,
+      "readme_files": [],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    },
+    {
+      "name": "gaze_scroll",
+      "path": "/home/penguin/code/gaze_scroll",
+      "is_git": true,
+      "top_files": [
+        ".gitignore",
+        "ALGORITHMS.md",
+        "ARCHITECTURE.md",
+        "EXPERIMENTS.md",
+        "README.md",
+        "ROADMAP.md",
+        "TODO.md",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "vite.config.js"
+      ],
+      "top_dirs": [
+        "src",
+        "tests"
+      ],
+      "manifests": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [
+        "javascript"
+      ],
+      "package_manager": "npm",
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    },
+    {
+      "name": "geb",
+      "path": "/home/penguin/code/geb",
+      "is_git": true,
+      "top_files": [
+        "GEB.pdf",
+        "README.md",
+        "experience-design.md",
+        "experiments.css",
+        "experiments.html",
+        "experiments.js",
+        "index.html",
+        "interaction-map.md",
+        "mathematical-spine.md",
+        "research.md",
+        "script.js",
+        "skin-in-the-game-nassim-nicholas-taleb.pdf",
+        "style.css",
+        "visual-language.md"
+      ],
+      "top_dirs": [
+        "research"
+      ],
+      "manifests": [],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [
+        "javascript"
+      ],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    },
+    {
+      "name": "gods-eye-view",
+      "path": "/home/penguin/code/gods-eye-view",
+      "is_git": true,
+      "top_files": [
+        ".env.example",
+        ".gitattributes",
+        ".gitignore",
+        ".prettierignore",
+        ".prettierrc.json",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "DATA_SOURCES.md",
+        "LICENSE",
+        "README.md",
+        "SECURITY.md",
+        "TESTING.md",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "style.css",
+        "vite.config.js"
+      ],
+      "top_dirs": [
+        ".gev-cache",
+        ".gev-logs",
+        ".github",
+        "config",
+        "docs",
+        "pinokio",
+        "public",
+        "scripts",
+        "server",
+        "src",
+        "tools"
+      ],
+      "manifests": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [
+        ".env.example"
+      ],
+      "shell_scripts": [],
+      "languages": [
+        "javascript",
+        "shell"
+      ],
+      "package_manager": "npm",
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    },
+    {
+      "name": "human-broker",
+      "path": "/home/penguin/code/human-broker",
+      "is_git": false,
+      "top_files": [
+        ".env",
+        ".env.example",
+        ".gitignore",
+        "README.md",
+        "docker-compose.yml",
+        "package-lock.json",
+        "package.json"
+      ],
+      "top_dirs": [
+        "apps",
+        "db",
+        "docker",
+        "docs",
+        "evals",
+        "packages",
+        "scripts"
+      ],
+      "manifests": [
+        "package.json",
+        "package-lock.json",
+        "pyproject.toml",
+        "docker-compose.yml"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [
+        ".env",
+        ".env.example"
+      ],
+      "shell_scripts": [],
+      "languages": [
+        "python"
+      ],
+      "package_manager": "npm",
+      "docker_compose": true,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": [
+        "docker-compose"
+      ]
+    },
+    {
+      "name": "infinite_zoom",
+      "path": "/home/penguin/code/infinite_zoom",
+      "is_git": false,
+      "top_files": [
+        ".gitignore",
+        "README.md",
+        "build.gradle.kts",
+        "gradle.properties",
+        "gradlew",
+        "gradlew.bat",
+        "local.properties",
+        "settings.gradle.kts"
+      ],
+      "top_dirs": [
+        "app",
+        "gradle"
+      ],
+      "manifests": [
+        "build.gradle.kts",
+        "settings.gradle.kts",
+        "gradlew"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": true,
+      "docs_only": false,
+      "kinds": [
+        "android"
+      ]
+    },
+    {
+      "name": "jobhunter",
+      "path": "/home/penguin/code/jobhunter",
+      "is_git": false,
+      "top_files": [
+        ".env.example",
+        ".gitignore",
+        "README.md",
+        "docker-compose.yml",
+        "jobhunter.db",
+        "pyproject.toml",
+        "setup.sh"
+      ],
+      "top_dirs": [
+        "backend",
+        "frontend",
+        "screenshots",
+        "tests",
+        "uploads"
+      ],
+      "manifests": [
+        "package.json",
+        "pnpm-lock.yaml",
+        "pyproject.toml",
+        "requirements.txt",
+        "docker-compose.yml",
+        "Dockerfile"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [
+        ".env.example"
+      ],
+      "shell_scripts": [
+        "setup.sh"
+      ],
+      "languages": [
+        "python",
+        "javascript",
+        "typescript",
+        "shell"
+      ],
+      "package_manager": null,
+      "docker_compose": true,
+      "dockerfile": true,
+      "android": false,
+      "docs_only": false,
+      "kinds": [
+        "docker-compose"
+      ]
+    },
+    {
+      "name": "microsaas",
+      "path": "/home/penguin/code/microsaas",
+      "is_git": false,
+      "top_files": [
+        "bengaluru_opportunity_genome.md",
+        "bengaluru_startup_opportunity_atlas_2026.md",
+        "bengaluru_top_100_opportunities.csv",
+        "bengaluru_top_25_opportunities.csv",
+        "bengaluru_validation_playbook.md",
+        "mega_startup_opportunity_atlas_2026.md",
+        "top_25_opportunities.csv"
+      ],
+      "top_dirs": [],
+      "manifests": [],
+      "readme": false,
+      "readme_files": [],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": true,
+      "kinds": [
+        "docs-only"
+      ]
+    },
+    {
+      "name": "musicalbook",
+      "path": "/home/penguin/code/musicalbook",
+      "is_git": false,
+      "top_files": [
+        ".gitignore",
+        ".oxlintrc.json",
+        "README.md",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "tsconfig.app.json",
+        "tsconfig.json",
+        "tsconfig.node.json",
+        "vite.config.ts"
+      ],
+      "top_dirs": [
+        "content",
+        "public",
+        "scripts",
+        "src",
+        "tools"
+      ],
+      "manifests": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [
+        "typescript",
+        "javascript"
+      ],
+      "package_manager": "npm",
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    },
+    {
+      "name": "omarchy",
+      "path": "/home/penguin/code/omarchy",
+      "is_git": true,
+      "top_files": [
+        ".editorconfig",
+        ".gitignore",
+        ".luarc.json",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "LICENSE",
+        "README.md",
+        "icon.png",
+        "icon.txt",
+        "logo.svg",
+        "logo.txt",
+        "version"
+      ],
+      "top_dirs": [
+        ".github",
+        "agents",
+        "applications",
+        "bin",
+        "config",
+        "default",
+        "docs",
+        "etc",
+        "install",
+        "manual",
+        "migrations",
+        "plans",
+        "shell",
+        "test",
+        "themes"
+      ],
+      "manifests": [],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [
+        "shell"
+      ],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    },
+    {
+      "name": "phoneaway",
+      "path": "/home/penguin/code/phoneaway",
+      "is_git": false,
+      "top_files": [
+        ".gitignore",
+        "README.md",
+        "build.gradle.kts",
+        "gradle.properties",
+        "gradlew",
+        "gradlew.bat",
+        "settings.gradle.kts"
+      ],
+      "top_dirs": [
+        "app",
+        "gradle"
+      ],
+      "manifests": [
+        "build.gradle.kts",
+        "settings.gradle.kts",
+        "gradlew"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": true,
+      "docs_only": false,
+      "kinds": [
+        "android"
+      ]
+    },
+    {
+      "name": "polymarket",
+      "path": "/home/penguin/code/polymarket",
+      "is_git": false,
+      "top_files": [
+        ".env",
+        ".env.example",
+        ".gitignore",
+        "README.md",
+        "docker-compose.yml",
+        "pytest.ini",
+        "restart.sh",
+        "start.sh",
+        "status.sh",
+        "stop.sh"
+      ],
+      "top_dirs": [
+        "alembic",
+        "backend",
+        "docs",
+        "frontend",
+        "logs",
+        "scripts",
+        "tests"
+      ],
+      "manifests": [
+        "package.json",
+        "package-lock.json",
+        "requirements.txt",
+        "docker-compose.yml",
+        "Dockerfile"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [
+        ".env",
+        ".env.example"
+      ],
+      "shell_scripts": [
+        "restart.sh",
+        "start.sh",
+        "status.sh",
+        "stop.sh"
+      ],
+      "languages": [
+        "python",
+        "shell",
+        "javascript",
+        "typescript"
+      ],
+      "package_manager": null,
+      "docker_compose": true,
+      "dockerfile": true,
+      "android": false,
+      "docs_only": false,
+      "kinds": [
+        "docker-compose"
+      ]
+    },
+    {
+      "name": "project-launcher",
+      "path": "/home/penguin/code/project-launcher",
+      "is_git": false,
+      "top_files": [
+        "INVENTORY.md",
+        "inventory.json"
+      ],
+      "top_dirs": [
+        "discovery",
+        "docs",
+        "scripts",
+        "src",
+        "test"
+      ],
+      "manifests": [],
+      "readme": false,
+      "readme_files": [],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [
+        "javascript"
+      ],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    },
+    {
+      "name": "prospectpilot",
+      "path": "/home/penguin/code/prospectpilot",
+      "is_git": false,
+      "top_files": [
+        ".env",
+        ".env.example",
+        "README.md",
+        "docker-compose.yml"
+      ],
+      "top_dirs": [
+        "backend",
+        "frontend"
+      ],
+      "manifests": [
+        "requirements.txt",
+        "docker-compose.yml",
+        "Dockerfile"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [
+        ".env",
+        ".env.example"
+      ],
+      "shell_scripts": [],
+      "languages": [
+        "javascript"
+      ],
+      "package_manager": null,
+      "docker_compose": true,
+      "dockerfile": true,
+      "android": false,
+      "docs_only": false,
+      "kinds": [
+        "docker-compose"
+      ]
+    },
+    {
+      "name": "restaurantbills",
+      "path": "/home/penguin/code/restaurantbills",
+      "is_git": false,
+      "top_files": [
+        "README.md"
+      ],
+      "top_dirs": [
+        "backend",
+        "data",
+        "frontend",
+        "tests"
+      ],
+      "manifests": [
+        "package.json",
+        "package-lock.json",
+        "requirements.txt"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [
+        "python",
+        "javascript",
+        "typescript"
+      ],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    },
+    {
+      "name": "rune",
+      "path": "/home/penguin/code/rune",
+      "is_git": false,
+      "top_files": [
+        ".editorconfig",
+        ".gitignore",
+        "README.md",
+        "build.gradle.kts",
+        "gradle.properties",
+        "gradlew",
+        "gradlew.bat",
+        "rune-0.2.0-debug.apk",
+        "settings.gradle.kts"
+      ],
+      "top_dirs": [
+        "app",
+        "core",
+        "docs",
+        "feature",
+        "gradle",
+        "source"
+      ],
+      "manifests": [
+        "build.gradle.kts",
+        "settings.gradle.kts",
+        "gradlew"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [],
+      "package_manager": null,
+      "docker_compose": false,
+      "dockerfile": false,
+      "android": true,
+      "docs_only": false,
+      "kinds": [
+        "android"
+      ]
+    },
+    {
+      "name": "vercel",
+      "path": "/home/penguin/code/vercel",
+      "is_git": true,
+      "top_files": [
+        ".editorconfig",
+        ".gitattributes",
+        ".gitignore",
+        ".node_version",
+        ".npmrc",
+        ".nvmrc",
+        ".prettierignore",
+        ".syncpackrc.json",
+        ".vercel.approvers",
+        ".vercelignore",
+        "AGENTS.md",
+        "Cargo.lock",
+        "Cargo.toml",
+        "DEVELOPING_A_RUNTIME.md",
+        "LICENSE",
+        "README.md",
+        "RELEASE.md",
+        "biome.jsonc",
+        "fx-diff-test.txt",
+        "mise.toml",
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "pyproject.toml",
+        "test-cursor-detection.js",
+        "tsconfig.base.json",
+        "turbo.json",
+        "uv.lock",
+        "vercel.json",
+        "vitest.config.mts"
+      ],
+      "top_dirs": [
+        ".changeset",
+        ".claude",
+        ".github",
+        ".husky",
+        "api",
+        "crates",
+        "errors",
+        "examples",
+        "internals",
+        "packages",
+        "python",
+        "scripts",
+        "skills",
+        "test",
+        "utils"
+      ],
+      "manifests": [
+        "package.json",
+        "pnpm-lock.yaml",
+        "package-lock.json",
+        "yarn.lock",
+        "pyproject.toml",
+        "requirements.txt",
+        "uv.lock",
+        "Dockerfile",
+        "Cargo.toml",
+        "go.mod",
+        "Gemfile"
+      ],
+      "readme": true,
+      "readme_files": [
+        "README.md"
+      ],
+      "env_files": [],
+      "shell_scripts": [],
+      "languages": [
+        "javascript",
+        "typescript",
+        "shell"
+      ],
+      "package_manager": "pnpm",
+      "docker_compose": false,
+      "dockerfile": true,
+      "android": false,
+      "docs_only": false,
+      "kinds": []
+    }
+  ]
+}

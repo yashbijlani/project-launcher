@@ -1,0 +1,31 @@
+{
+  "name": "project-launcher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Universal local project launcher: deterministic discovery, supervised multi-service start/stop.",
+  "bin": {
+    "launcher": "./bin/launcher.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --max-warnings=0",
+    "test": "node --test test/*.test.js",
+    "scan": "node bin/launcher.js scan",
+    "launcher": "node bin/launcher.js"
+  },
+  "dependencies": {
+    "yaml": "^2.5.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.7.0",
+    "eslint": "^9.12.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.8.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

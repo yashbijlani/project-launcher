@@ -1,0 +1,243 @@
+[
+  {
+    "name": "agentdock",
+    "confidence": 0.5,
+    "unsafe": true,
+    "services": 1,
+    "commands": [
+      "docker compose up"
+    ],
+    "manual": false
+  },
+  {
+    "name": "blindfold-chess",
+    "confidence": 0.5,
+    "unsafe": true,
+    "services": 1,
+    "commands": [
+      "./gradlew build"
+    ],
+    "manual": false
+  },
+  {
+    "name": "book-copilot",
+    "confidence": 0.95,
+    "unsafe": false,
+    "services": 3,
+    "commands": [
+      "docker compose up db",
+      "docker compose up api",
+      "docker compose up web"
+    ],
+    "manual": false
+  },
+  {
+    "name": "bullet_engine",
+    "confidence": 0.55,
+    "unsafe": false,
+    "services": 1,
+    "commands": [
+      ".venv/bin/python scripts/web.py"
+    ],
+    "manual": false
+  },
+  {
+    "name": "camera-copilot",
+    "confidence": 0.5,
+    "unsafe": true,
+    "services": 1,
+    "commands": [
+      "./gradlew build"
+    ],
+    "manual": false
+  },
+  {
+    "name": "clash",
+    "confidence": 0.95,
+    "unsafe": false,
+    "services": 1,
+    "commands": [
+      "npm run dev"
+    ],
+    "manual": false
+  },
+  {
+    "name": "desktop-tutor",
+    "confidence": 0.55,
+    "unsafe": false,
+    "services": 1,
+    "commands": [
+      "python3 scripts/run_demo.py"
+    ],
+    "manual": false
+  },
+  {
+    "name": "freedom",
+    "confidence": 0.5,
+    "unsafe": true,
+    "services": 1,
+    "commands": [
+      "python3 serve.py"
+    ],
+    "manual": false
+  },
+  {
+    "name": "gaze_scroll",
+    "confidence": 0.95,
+    "unsafe": false,
+    "services": 1,
+    "commands": [
+      "npm run dev"
+    ],
+    "manual": false
+  },
+  {
+    "name": "geb",
+    "confidence": 0,
+    "unsafe": false,
+    "services": 0,
+    "commands": [],
+    "manual": true
+  },
+  {
+    "name": "gods-eye-view",
+    "confidence": 0.95,
+    "unsafe": false,
+    "services": 1,
+    "commands": [
+      "npm run dev"
+    ],
+    "manual": false
+  },
+  {
+    "name": "human-broker",
+    "confidence": 0.95,
+    "unsafe": false,
+    "services": 4,
+    "commands": [
+      "docker compose up postgres",
+      "docker compose up redis",
+      "npm run dev",
+      "../../.venv/bin/python -m uvicorn app.main:app --reload"
+    ],
+    "manual": false
+  },
+  {
+    "name": "infinite_zoom",
+    "confidence": 0.5,
+    "unsafe": true,
+    "services": 1,
+    "commands": [
+      "./gradlew build"
+    ],
+    "manual": false
+  },
+  {
+    "name": "jobhunter",
+    "confidence": 0.95,
+    "unsafe": false,
+    "services": 3,
+    "commands": [
+      "docker compose up db",
+      "docker compose up backend",
+      "docker compose up frontend"
+    ],
+    "manual": false
+  },
+  {
+    "name": "microsaas",
+    "confidence": 0,
+    "unsafe": false,
+    "services": 0,
+    "commands": [],
+    "manual": true
+  },
+  {
+    "name": "musicalbook",
+    "confidence": 0.95,
+    "unsafe": false,
+    "services": 1,
+    "commands": [
+      "npm run dev"
+    ],
+    "manual": false
+  },
+  {
+    "name": "omarchy",
+    "confidence": 0,
+    "unsafe": false,
+    "services": 0,
+    "commands": [],
+    "manual": true
+  },
+  {
+    "name": "phoneaway",
+    "confidence": 0.5,
+    "unsafe": true,
+    "services": 1,
+    "commands": [
+      "./gradlew build"
+    ],
+    "manual": false
+  },
+  {
+    "name": "polymarket",
+    "confidence": 0.95,
+    "unsafe": false,
+    "services": 7,
+    "commands": [
+      "docker compose up postgres",
+      "docker compose up backend",
+      "docker compose up copy_worker",
+      "docker compose up agent_worker",
+      "docker compose up benchmark_worker",
+      "docker compose up resolution_worker",
+      "docker compose up frontend"
+    ],
+    "manual": false
+  },
+  {
+    "name": "prospectpilot",
+    "confidence": 0.9,
+    "unsafe": false,
+    "services": 4,
+    "commands": [
+      "docker compose up db",
+      "docker compose up redis",
+      "docker compose up backend",
+      "docker compose up worker"
+    ],
+    "manual": false
+  },
+  {
+    "name": "restaurantbills",
+    "confidence": 0.95,
+    "unsafe": false,
+    "services": 2,
+    "commands": [
+      "npm run dev",
+      "backend/.venv/bin/python -m uvicorn backend.main:app --reload"
+    ],
+    "manual": false
+  },
+  {
+    "name": "rune",
+    "confidence": 0.5,
+    "unsafe": true,
+    "services": 1,
+    "commands": [
+      "./gradlew build"
+    ],
+    "manual": false
+  },
+  {
+    "name": "vercel",
+    "confidence": 0.6,
+    "unsafe": false,
+    "services": 1,
+    "commands": [
+      "python3 main.py"
+    ],
+    "manual": false
+  }
+]
