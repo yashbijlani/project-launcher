@@ -2,8 +2,13 @@
 
 - Path: `/home/penguin/code/geb`
 - Confidence: **0.00**
+- Readiness: **unknown**
 - Unsafe to auto-run: no
 - Stack signals: GenericWeb
+
+## Blockers
+
+- [unknown] No services configured; run discovery or add services manually
 
 ## Services
 

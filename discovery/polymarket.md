@@ -2,44 +2,70 @@
 
 - Path: `/home/penguin/code/polymarket`
 - Confidence: **0.95**
+- Readiness: **needs_docker**
 - Unsafe to auto-run: no
 - Stack signals: Docker, Node, FastAPI, Python, ShellScript
+
+## Blockers
+
+- [docker] Docker daemon unavailable
+  - suggestion: Start the Docker daemon, then retry (launcher never starts it automatically)
+
+## Runnable targets
+
+- `frontend-frontend` — frontend (frontend): `npm run dev` (cwd frontend)
+- `backend-backend` — backend (backend): `../.venv/bin/python -m uvicorn app.main:app --reload` (cwd backend)
+- `stack-root` — stack (primary): `docker compose up postgres`
 
 ## Services
 
 ### postgres
 - Command: `docker compose up postgres`
 - Working directory: `.`
+- Runtime: compose
+- Provenance: detector/docker (confidence 0.90)
 
 ### backend
 - Command: `docker compose up backend`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: postgres
+- Provenance: detector/docker (confidence 0.90)
 
 ### copy-worker
 - Command: `docker compose up copy_worker`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: postgres
+- Provenance: detector/docker (confidence 0.90)
 
 ### agent-worker
 - Command: `docker compose up agent_worker`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: postgres
+- Provenance: detector/docker (confidence 0.90)
 
 ### benchmark-worker
 - Command: `docker compose up benchmark_worker`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: postgres
+- Provenance: detector/docker (confidence 0.90)
 
 ### resolution-worker
 - Command: `docker compose up resolution_worker`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: postgres
+- Provenance: detector/docker (confidence 0.90)
 
 ### frontend
 - Command: `docker compose up frontend`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: backend, postgres
+- Provenance: detector/docker (confidence 0.90)
 
 ## Detector evidence
 

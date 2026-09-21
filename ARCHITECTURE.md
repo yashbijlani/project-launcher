@@ -15,17 +15,21 @@ detectors
   ↓
 candidate startup commands with evidence
   ↓
-discovery reconciliation
+discovery reconciliation (provenance, runtime kinds, targets, readiness)
   ↓
 editable YAML project configuration
   ↓
+config fingerprint
+  ↓
+verification workflow (validate → prereqs → own → start → health → stop → cleanup)
+  ↓
 dependency graph
   ↓
-process supervisor and health checks
+process supervisor, health checks, identity-verified ownership
   ↓
-persisted state, leases, and logs
+persisted state, locks, and logs
   ↓
-CLI, HTTP API, desktop UI, or hotkey
+CLI, HTTP API + SSE, desktop UI, or hotkey
 ```
 
 Optional AI runs beside this pipeline:
@@ -212,15 +216,88 @@ It only registers a key binding; it does not alter runtime semantics.
 - a null provider used by default
 - evidence redaction
 - proposal parsing
-- proposal validation
+- layered proposal validation
 
-Validation rejects:
+Validation layers:
 
-- low-confidence proposals
-- empty proposals
-- empty commands
-- `sudo`
-- obviously destructive shell operations
+1. structural: ids, dependencies, cycles, profiles, actions, health checks
+2. filesystem: cwd containment, no arbitrary absolute paths
+3. evidence: directly evidenced vs derived vs AI-invented commands
+4. security: `sudo`, destructive operations, download-and-execute, decoded
+   payloads, credential exfiltration patterns, raw devices, permission weakening
+
+AI output is a proposal only. It is validated, then requires explicit approval, and
+is subject to the same runtime safety gate and verification as any other config.
+
+## Safety gate
+
+`src/safety.ts` is the single authoritative gate used by start, verify, the HTTP API,
+and AI import:
+
+- `assertSafeToOperate(project, { allowUnsafe, unsafeApproval, operation })`
+- `isUnsafeAuthorized` requires `--allow-unsafe` or a well-formed
+  `{ projectId, reason }` approval (reason >= 8 chars). Bare booleans are ambiguous.
+- `resolveInsideRoot` rejects cwd traversal outside the project root.
+- `validateProjectStructure` checks ids, duplicate ids, empty commands, runtime
+  kinds, health checks, restart policies, provenance sources, dependency references,
+  cycles, profiles, actions, and cwd containment.
+- `validateProjectPaths` checks that configured paths exist (read-only).
+
+## Verification and fingerprint
+
+`src/verify.ts` implements the deterministic verification workflow. It starts real
+services (the only way to prove health), gated by prerequisites, unsafe approval,
+ownership, and cleanup confirmation. It never installs dependencies or modifies
+repositories.
+
+`src/fingerprint.ts` computes a sha256 over id, root, services, profiles, and actions
+(stable key order, startup-relevant fields). A verification record is current only
+when its fingerprint matches. Editing startup-relevant config invalidates it.
+
+## Ownership locking
+
+`src/lock.ts` provides atomic per-project ownership:
+
+- `~/.local/share/project-launcher/locks/<project>.lock`
+- `open(..., 'wx')` for atomic creation
+- owner PID + kernel start time + instance UUID + heartbeat
+- stale detection (dead owner, reused PID, expired heartbeat) with quarantine and
+  one retry
+- in-process re-entrancy via a depth counter for nested operations
+- release only by the owning instance
+
+## Process identity
+
+`src/proc.ts` reads `/proc/<pid>/stat` to build a process identity:
+
+- PID, process group, kernel start time (field 22), comm, command fingerprint
+- match = PID + kernel start time, which is stable across `exec` and changes on PID
+  reuse
+- used by reconcile (before start/stop/restart/status/verify) and by stop to refuse
+  signaling a reused PID
+
+## Readiness
+
+`src/prereqs.ts` performs read-only inspection: Node tooling on PATH, package.json
+scripts, `node_modules`, Python interpreters/modules, shell scripts, `.env` gaps, and
+Docker daemon availability. `computeReadiness` maps these to structured statuses and
+blockers. Nothing is installed or started.
+
+## Docker
+
+`src/docker.ts` prefers `docker compose config --format json` and falls back to the
+built-in parser. It normalizes services, ports, `depends_on`, conditions,
+environment, volumes, profiles, and health checks. Compose services carry
+`runtime: compose`; hybrid graphs combine Compose infrastructure with local process
+services. Device and external services are never spawned as plain processes.
+
+## Live events
+
+`src/server.ts` publishes events over Server-Sent Events (`/api/events`):
+`project.started`, `project.stopped`, `project.failed`, `service.starting`,
+`service.started`, `service.healthy`, `service.failed`, `service.unhealthy`,
+`service.exited`, and `verification.completed`. Events are derived from manager state
+transitions; the stateless CLI is unaffected.
 
 ## Learn mode
 
@@ -233,7 +310,11 @@ project root.
 ## Test layers
 
 - Unit tests cover dependency ordering, cycle detection, profile validation, Compose parsing,
-  detector fallbacks, process-tree cleanup, failure classification, and learning setup.
+  detector fallbacks, workspace targets, process-tree cleanup, failure classification,
+  locking, stale recovery, PID-reuse detection, the safety gate, cwd traversal,
+  fingerprints, verification outcomes, readiness, and AI proposal validation.
+- API tests verify unsafe enforcement over HTTP.
+- Runtime tests verify duplicate-start prevention, orphan reclaim, PID-reuse refusal,
+  restart-loop suppression, and a full discover -> configure -> verify -> start ->
+  cross-CLI status/stop -> cleanup flow.
 - Corpus discovery tests the detectors against real repositories.
-- Manual end-to-end tests verify start, health, logs, status, restart, stop, cleanup, and
-  configuration persistence.

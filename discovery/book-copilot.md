@@ -1,36 +1,48 @@
 # Discovery: book-copilot
 
 - Path: `/home/penguin/code/book-copilot`
-- Confidence: **0.95**
+- Confidence: **0.90**
+- Readiness: **needs_docker**
 - Unsafe to auto-run: no
-- Stack signals: Docker, Node, FastAPI, Python
+- Stack signals: Docker, FastAPI, Python
+
+## Blockers
+
+- [docker] Docker daemon unavailable
+  - suggestion: Start the Docker daemon, then retry (launcher never starts it automatically)
+
+## Runnable targets
+
+- `backend-apps-api` — backend (apps/api): `python3 -m uvicorn app.main:app --reload` (cwd apps/api)
+- `stack-root` — stack (primary): `docker compose up db`
 
 ## Services
 
 ### db
 - Command: `docker compose up db`
 - Working directory: `.`
+- Runtime: compose
+- Provenance: detector/docker (confidence 0.90)
 
 ### api
 - Command: `docker compose up api`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: db
+- Provenance: detector/docker (confidence 0.90)
 
 ### web
 - Command: `docker compose up web`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: api, db
+- Provenance: detector/docker (confidence 0.90)
 
 ## Detector evidence
 
 - **DockerDetector** (confidence 0.90)
   - compose file docker-compose.yml with services: db, api, web
   - Dockerfile at apps/api/Dockerfile
-- **NodeDetector** (confidence 0.95)
-  - package.json at apps/web/package.json
-  - package manager: npm (apps/web/package-lock.json)
-  - script "dev": `next dev`
-  - package name: book-copilot-web
 - **FastAPIDetector** (confidence 0.35)
   - fastapi/uvicorn referenced in apps/api/requirements.txt
   - no ASGI application object was found
@@ -42,8 +54,6 @@
 
 ## Ambiguous alternates (need a human decision)
 
-- `npm run dev` (cwd apps/web) — role frontend
-- `npm start` (cwd apps/web) — role frontend
 - `python3 -m uvicorn app.main:app --reload` (cwd apps/api) — role backend
 - `python3 -m uvicorn app.main:app` (cwd apps/api) — role backend
 
@@ -51,16 +61,4 @@
 
 - Compose services were expanded into individual services. Their internal ports are managed by Docker; health checks are not configured by default.
 - Detected docker-compose: docker-compose.yml
-- A docker-compose stack was detected; local Node commands are listed as alternates. Remove the compose stack and re-discover to use local commands.
-
-## Startup verification
-
-- Not started.
-- Classification: `DOCKER_REQUIRED`.
-- `docker compose config` parsed successfully and exposed the intended topology:
-  - `db` maps host port 5432 and has a `pg_isready` health check.
-  - `api` depends on healthy `db` and maps host port 8000.
-  - `web` depends on `api` and maps host port 3000.
-- The local Docker daemon was unavailable (`docker info` failed), so no containers were built, started, or exposed.
-- Local app fallbacks are visible as ambiguous alternates because Compose is authoritative for this repository.
 

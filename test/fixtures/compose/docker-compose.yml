@@ -1,0 +1,17 @@
+services:
+  db:
+    image: busybox:1
+    command: ["httpd", "-f", "-p", "8081", "-h", "/tmp"]
+    ports:
+      - "18081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+  app:
+    image: busybox:1
+    command: ["sh", "-c", "wget -qO- http://db:8081 >/dev/null && sleep 300"]
+    depends_on:
+      db:
+        condition: service_healthy

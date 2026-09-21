@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { RuntimeProjectState, ServiceStatus } from './types.js';
+import type { RuntimeProjectState, ServiceStatus, ProcessIdentity } from './types.js';
 import { stateDir } from './paths.js';
 
 export interface SupervisorLease {
@@ -95,7 +95,7 @@ export function isProcessAlive(pid: number): boolean {
 export function mergeServiceStatus(
   state: RuntimeProjectState,
   id: string,
-  patch: Partial<{ status: ServiceStatus; pid: number; startedAt: number; stoppedAt: number; exitCode: number | null; signal: string | null; restarts: number }>,
+  patch: Partial<{ status: ServiceStatus; pid: number; process: ProcessIdentity; startedAt: number; stoppedAt: number; exitCode: number | null; signal: string | null; restarts: number }>,
 ): void {
   const prev = state.services[id] || { id, status: 'stopped', restarts: 0 };
   state.services[id] = { ...prev, ...patch };

@@ -21,6 +21,8 @@ export interface DiscoveryOutcome {
   evidence: ProjectEvidence;
   /** Commands that need a human decision (ambiguous). */
   ambiguous: CandidateCommand[];
+  /** Runnable targets grouped by directory/role, for monorepo selection. */
+  targets: DiscoveryTarget[];
 }
 
 /**
@@ -72,6 +74,7 @@ export function reconcile(
           command: c.command,
           cwd: c.cwd,
           restartPolicy: 'never',
+          runtime: 'compose',
           notes: 'Infrastructure service managed by docker compose.',
         });
         used.push(c);
@@ -89,6 +92,7 @@ export function reconcile(
           cwd: c.cwd,
           dependsOn: (c.dependsOn || []).map(slugify).filter((d) => d !== id),
           restartPolicy: 'never',
+          runtime: 'compose',
         });
         used.push(c);
       }
@@ -104,6 +108,7 @@ export function reconcile(
         command: cmd.command,
         cwd: cmd.cwd,
         restartPolicy: 'never',
+        runtime: 'compose',
       });
       used.push(cmd);
       dockerStackProposed = true;
@@ -130,7 +135,7 @@ export function reconcile(
       cwd: primary.cwd,
       restartPolicy: 'never',
     };
-    const port = guessPortFromCommand(primary.command) ?? (nodeDetection?.meta?.devServerPort as number | undefined);
+    const port = primary.port ?? guessPortFromCommand(primary.command) ?? (nodeDetection?.meta?.devServerPort as number | undefined);
     if (port) {
       svc.port = port;
       svc.healthCheck = { type: 'http', url: `http://localhost:${port}`, startPeriodMs: 30_000 };
@@ -166,7 +171,13 @@ export function reconcile(
     );
     if (port) {
       svc.port = port;
-      svc.healthCheck = { type: 'http', url: `http://localhost:${port}`, startPeriodMs: 45_000 };
+      // Framework-aware default: FastAPI's root (/) is commonly 404; /docs is a
+      // reliable built-in endpoint. TCP remains the fallback when configured manually.
+      const frameworks = (pyDetection?.meta?.frameworks as string[]) || [];
+      const healthUrl = frameworks.includes('fastapi') && /uvicorn/.test(primary.command)
+        ? `http://localhost:${port}/docs`
+        : `http://localhost:${port}`;
+      svc.healthCheck = { type: 'http', url: healthUrl, startPeriodMs: 45_000 };
     }
     services.push(svc);
     used.push(primary);
@@ -218,6 +229,7 @@ export function reconcile(
       name: 'android app',
       command: androidDetection.candidates[0]?.command || './gradlew build',
       restartPolicy: 'never',
+      runtime: 'device',
       notes: 'Requires Android SDK, Gradle, and a device/emulator. Marked unsafe to auto-run.',
     });
   }
@@ -241,6 +253,9 @@ export function reconcile(
 
   // Infer app -> infra dependencies by scanning manifest text for db/cache usage.
   inferInfraDependencies(root, services);
+
+  // Attach provenance and runtime kinds after reconciliation.
+  attachProvenance(services, detections);
 
   // Deduplicate ambiguous against used
   const ambiguousFinal = ambiguous.filter(
@@ -292,7 +307,9 @@ export function reconcile(
     detections,
   };
 
-  return { project, detections, confidence: overall, warnings, evidence, ambiguous: ambiguousFinal };
+  const targets = buildTargets(detections, services, used, ambiguousFinal);
+
+  return { project, detections, confidence: overall, warnings, evidence, ambiguous: ambiguousFinal, targets };
 }
 
 function computeConfidence(
@@ -362,6 +379,106 @@ function serviceIdFor(role: string, dir: string): string {
   return slugify(`${role}-${segments.slice(-2).join('-')}`);
 }
 
+/** Attach detector provenance to each reconciled service. */
+function attachProvenance(services: Service[], detections: Detection[]): void {
+  const norm = (c: string | undefined): string => c || '';
+  for (const svc of services) {
+    if (svc.provenance) continue;
+    for (const d of detections) {
+      const detector = d.type.replace(/Detector$/, '').toLowerCase();
+      const match = d.candidates.find((c) => c.command === svc.command && norm(c.cwd) === norm(svc.cwd));
+      if (match) {
+        svc.provenance = {
+          source: 'detector',
+          detector,
+          confidence: d.confidence,
+          evidence: d.evidence.slice(0, 4),
+        };
+        break;
+      }
+      if (svc.command.startsWith('docker compose') && d.type === 'DockerDetector') {
+        svc.provenance = { source: 'detector', detector: 'docker', confidence: d.confidence, evidence: d.evidence.slice(0, 4) };
+        if (!svc.runtime) svc.runtime = 'compose';
+        break;
+      }
+      if (svc.command.startsWith('./gradlew') && d.type === 'AndroidDetector') {
+        svc.provenance = { source: 'detector', detector: 'android', confidence: d.confidence, evidence: d.evidence.slice(0, 4) };
+        if (!svc.runtime) svc.runtime = 'device';
+        break;
+      }
+    }
+  }
+}
+
+export interface DiscoveryTarget {
+  key: string;
+  label: string;
+  command: string;
+  cwd?: string;
+  role?: string;
+  confidence: number;
+  primary: boolean;
+  /** Service ids in the reconciled project that implement this target. */
+  serviceIds: string[];
+}
+
+/**
+ * Runnable targets grouped by working directory and role.
+ * Used for monorepo/package selection: the user picks a target instead of
+ * accepting the whole reconciled project.
+ */
+export function buildTargets(
+  detections: Detection[],
+  services: Service[],
+  used: CandidateCommand[],
+  ambiguous: CandidateCommand[],
+): DiscoveryTarget[] {
+  const targets = new Map<string, DiscoveryTarget>();
+  const keyFor = (c: CandidateCommand): string =>
+    slugify(`${c.role || 'app'}-${c.cwd || 'root'}`);
+  const confidenceFor = (c: CandidateCommand): number => {
+    let best = 0;
+    for (const d of detections) {
+      if (d.candidates.some((x) => x.command === c.command && (x.cwd || '') === (c.cwd || ''))) {
+        best = Math.max(best, d.confidence);
+      }
+    }
+    return best;
+  };
+  const serviceIdsFor = (c: CandidateCommand): string[] =>
+    services.filter((s) => s.command === c.command && (s.cwd || '') === (c.cwd || '')).map((s) => s.id);
+  for (const c of used) {
+    const key = keyFor(c);
+    if (!targets.has(key)) {
+      targets.set(key, {
+        key,
+        label: `${c.role || 'app'}${c.cwd ? ` (${c.cwd})` : ''}`,
+        command: c.command,
+        cwd: c.cwd,
+        role: c.role,
+        confidence: confidenceFor(c),
+        primary: true,
+        serviceIds: serviceIdsFor(c),
+      });
+    }
+  }
+  for (const c of ambiguous) {
+    const key = keyFor(c);
+    if (!targets.has(key)) {
+      targets.set(key, {
+        key,
+        label: `${c.role || 'app'}${c.cwd ? ` (${c.cwd})` : ''}`,
+        command: c.command,
+        cwd: c.cwd,
+        role: c.role,
+        confidence: confidenceFor(c),
+        primary: false,
+        serviceIds: serviceIdsFor(c),
+      });
+    }
+  }
+  return [...targets.values()].sort((a, b) => b.confidence - a.confidence);
+}
 /** Infer app -> infra dependencies by scanning manifest text for db/cache usage. */
 function inferInfraDependencies(root: string, services: Service[]): void {
   const infra = services.filter((s) =>

@@ -2,24 +2,44 @@
 
 - Path: `/home/penguin/code/jobhunter`
 - Confidence: **0.95**
+- Readiness: **needs_credentials**
 - Unsafe to auto-run: no
 - Stack signals: Docker, Node, FastAPI, Python, ShellScript
+
+## Blockers
+
+- [credentials] .env is missing; 6 required variable(s) are empty in .env.example
+  - suggestion: Copy .env.example to .env and fill in the required values manually
+- [docker] Docker daemon unavailable
+  - suggestion: Start the Docker daemon, then retry (launcher never starts it automatically)
+
+## Runnable targets
+
+- `frontend-frontend` — frontend (frontend): `pnpm dev` (cwd frontend)
+- `backend-backend` — backend (backend): `python3 -m uvicorn app.main:app --reload` (cwd backend)
+- `stack-root` — stack (primary): `docker compose up db`
 
 ## Services
 
 ### db
 - Command: `docker compose up db`
 - Working directory: `.`
+- Runtime: compose
+- Provenance: detector/docker (confidence 0.90)
 
 ### backend
 - Command: `docker compose up backend`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: db
+- Provenance: detector/docker (confidence 0.90)
 
 ### frontend
 - Command: `docker compose up frontend`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: backend, db
+- Provenance: detector/docker (confidence 0.90)
 
 ## Detector evidence
 

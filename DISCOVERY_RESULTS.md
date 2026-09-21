@@ -166,3 +166,38 @@ It becomes ambiguous when:
 
 Those are precisely the cases where the launcher preserves alternates, lowers confidence,
 marks a project unsafe, or refuses to invent a command.
+
+## V2 addendum
+
+V2 re-ran discovery over the live corpus and added readiness, provenance, runtime
+kinds, workspace targets, and verification. The corpus changed between V1 and V2:
+`vercel`, `omarchy`, and `gods-eye-view` are no longer present, and
+`autonomous-contributor` appeared. Current per-project reports live in
+`discovery/<project>.md` and the current summary in `discovery/SUMMARY.md`.
+
+V2 snapshot (21 projects):
+
+- automatically understood (confidence >= 0.8, >= 1 service): **9**
+- detected but ambiguous: **9**
+- nothing detected / unknown: **3**
+- unsafe to auto-run: **7**
+- readiness `needs_device`: **5**
+- readiness `needs_docker`: **3**
+- readiness `needs_credentials`: **2**
+- readiness `ready_but_unverified`: **5**
+
+Verified with real start/health/stop/cleanup evidence: `gaze_scroll`, `musicalbook`,
+`bullet_engine`, and the multi-service `restaurantbills` (backend -> frontend).
+
+New in V2 discovery:
+
+- services carry provenance (detector + confidence + evidence);
+- services carry a runtime kind (`process`, `compose`, `device`, `external`);
+- workspace globs are expanded so monorepo targets are exposed (`launcher targets`);
+- FastAPI health checks suggest `/docs` rather than assuming `/`;
+- every project gets a readiness classification with structured blockers.
+
+The deterministic/ambiguous boundary from V1 still holds. V2 adds a second, sharper
+boundary: confidence (how sure discovery is) is now separate from verification
+(whether the exact configuration was actually proven to start, become healthy, and
+stop cleanly).

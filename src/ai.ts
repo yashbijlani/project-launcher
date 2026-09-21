@@ -6,6 +6,7 @@ import type {
   Service,
 } from './types.js';
 import { slugify } from './config.js';
+import { validateProjectStructure } from './safety.js';
 
 /**
  * Optional AI discovery adapter.
@@ -159,16 +160,86 @@ export function providerFromEnv(): IntelligentDiscoveryProvider {
 /**
  * Validate an AI proposal before it can be persisted.
  * This is the mandatory gate: AI output never bypasses it.
+ *
+ * Layered policy (not a single blacklist):
+ *  1. structural: ids, dependencies, cycles, profiles, actions, health checks
+ *  2. filesystem: cwd containment, no arbitrary absolute paths
+ *  3. evidence: directly evidenced vs derived vs AI-invented commands
+ *  4. security: destructive, privilege, exfiltration, and downloader patterns
  */
-export function validateProposal(proposal: ProjectProposal): { ok: boolean; errors: string[]; warnings: string[] } {
+export function validateProposal(
+  proposal: ProjectProposal,
+  evidence?: ProjectEvidence,
+): { ok: boolean; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings = [...proposal.warnings];
+  const project = proposal.project;
+
   if (proposal.confidence < 0.3) errors.push(`proposal confidence too low (${proposal.confidence})`);
-  if (!proposal.project.services.length) errors.push('proposal has no services');
-  for (const s of proposal.project.services) {
-    if (!s.command.trim()) errors.push(`service ${s.id} has empty command`);
-    if (/\bsudo\b/.test(s.command)) errors.push(`service ${s.id} uses sudo (refused)`);
-    if (/(rm\s+-rf\s+\/|mkfs|dd\s+if=|shutdown|reboot)/.test(s.command)) errors.push(`service ${s.id} contains a destructive command`);
+  if (!project.services.length) errors.push('proposal has no services');
+  if (!project.id || !/^[a-z0-9][a-z0-9-]*$/.test(project.id)) errors.push('proposal has an invalid project id');
+  if (!project.root) errors.push('proposal has no project root');
+
+  // Structural validation reuses the same gate as the runtime.
+  errors.push(...validateProjectStructure({ ...project, verification: undefined }));
+
+  // Filesystem: no absolute command paths outside the project, scripts must exist when claimed.
+  for (const s of project.services) {
+    for (const m of s.command.matchAll(/(^|\s)(\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+)/g)) {
+      const abs = m[2]!;
+      if (abs.startsWith(project.root + '/') || abs === project.root) continue;
+      if (/^\/(bin|usr\/bin|usr\/local\/bin|opt\/)/.test(abs)) continue; // system binary paths
+      errors.push(`service ${s.id} references an absolute path outside the project: ${abs}`);
+    }
+  }
+
+  // Evidence tiers.
+  if (evidence) {
+    const haystack = collectEvidenceText(evidence).toLowerCase();
+    for (const s of project.services) {
+      const cmd = s.command.toLowerCase();
+      const tokens = cmd.split(/[^a-z0-9_./-]+/).filter((t) => t.length > 2);
+      const evidenced = tokens.some((t) => haystack.includes(t)) || haystack.includes(cmd.slice(0, 60));
+      const scriptRef = cmd.match(/([a-z0-9_./-]+\.(py|sh|js|mjs))/)?.[1];
+      if (evidenced) {
+        warnings.push(`service ${s.id}: command is directly evidenced`);
+      } else if (scriptRef && haystack.includes(scriptRef.split('/').pop()!)) {
+        warnings.push(`service ${s.id}: command is derived from evidence (verify before running)`);
+      } else {
+        warnings.push(`service ${s.id}: AI-invented command (requires explicit approval AND successful verification)`);
+      }
+    }
+  }
+
+  // Security layer.
+  for (const s of project.services) {
+    const cmd = s.command;
+    if (/\bsudo\b/.test(cmd)) errors.push(`service ${s.id} uses sudo (refused)`);
+    if (/(rm\s+-rf\s+\/|mkfs(\.| )|dd\s+(if|of)=|shutdown|reboot|halt|poweroff)/.test(cmd)) {
+      errors.push(`service ${s.id} contains a destructive command`);
+    }
+    if (/(curl|wget)\s+.*\|\s*(bash|sh)/.test(cmd)) errors.push(`service ${s.id} pipes a download into a shell (refused)`);
+    if (/base64\s+(-d|--decode)/.test(cmd) && /\|\s*(bash|sh|python)/.test(cmd)) {
+      errors.push(`service ${s.id} decodes and executes a payload (refused)`);
+    }
+    if (/\benv\b.*\|\s*(curl|nc|bash)/.test(cmd) || /\/proc\/.*(password|secret|key)/.test(cmd)) {
+      errors.push(`service ${s.id} looks like credential exfiltration (refused)`);
+    }
+    if (/\/dev\/(sda|nvme|mem|kvm)/.test(cmd)) errors.push(`service ${s.id} touches a raw device (refused)`);
+    if (/chmod\s+(-R\s+)?777\s+\//.test(cmd)) errors.push(`service ${s.id} weakens system permissions (refused)`);
   }
   return { ok: errors.length === 0, errors, warnings };
+}
+
+function collectEvidenceText(evidence: ProjectEvidence): string {
+  const parts: string[] = [
+    evidence.readmeTitle || '',
+    evidence.readmeExcerpt || '',
+    (evidence.manifests || []).join('\n'),
+    JSON.stringify(evidence.signals || {}),
+  ];
+  for (const d of evidence.detections || []) {
+    parts.push(d.type, d.evidence.join('\n'), d.candidates.map((c) => `${c.command} ${c.cwd || ''}`).join('\n'));
+  }
+  return parts.join('\n');
 }

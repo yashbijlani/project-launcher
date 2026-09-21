@@ -1,13 +1,14 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import type { Project, Service, Profile, Action } from './types.js';
+import type { Project, Service, Profile, Action, ProjectVerification, ServiceProvenance } from './types.js';
 import { configDir, ensureDirs } from './paths.js';
 
 export interface YamlService {
   command: string;
   cwd?: string;
   port?: number;
+  runtime?: string;
   environment?: Record<string, string>;
   depends_on?: string[];
   healthcheck?: {
@@ -23,8 +24,40 @@ export interface YamlService {
     expectBody?: string;
   };
   restart?: string;
+  restart_max_attempts?: number;
+  restart_backoff_ms?: number;
   auto_start?: boolean;
   notes?: string;
+  provenance?: {
+    source?: string;
+    detector?: string;
+    confidence?: number;
+    evidence?: string[];
+  };
+}
+
+export interface YamlVerification {
+  status?: string;
+  verifiedAt?: string;
+  verified_at?: string;
+  launcherVersion?: string;
+  launcher_version?: string;
+  configFingerprint?: string;
+  config_fingerprint?: string;
+  environment?: Record<string, string>;
+  services?: Record<string, {
+    started?: boolean;
+    healthy?: boolean;
+    stoppedCleanly?: boolean;
+    stopped_cleanly?: boolean;
+    health?: { type?: string; url?: string; port?: number };
+    detail?: string;
+  }>;
+  dependencyOrder?: string[];
+  dependency_order?: string[];
+  failureClass?: string;
+  failure_class?: string;
+  detail?: string;
 }
 
 export interface YamlProject {
@@ -41,6 +74,7 @@ export interface YamlProject {
   services: Record<string, YamlService>;
   profiles?: Record<string, { services: string[]; description?: string }>;
   actions?: Record<string, { command: string; cwd?: string; description?: string }>;
+  verification?: YamlVerification;
 }
 
 export function slugify(s: string): string {
@@ -55,6 +89,7 @@ export function serviceToYaml(s: Service): YamlService {
   const out: YamlService = { command: s.command };
   if (s.cwd) out.cwd = s.cwd;
   if (typeof s.port === 'number') out.port = s.port;
+  if (s.runtime && s.runtime !== 'process') out.runtime = s.runtime;
   if (s.environment && Object.keys(s.environment).length) out.environment = s.environment;
   if (s.dependsOn && s.dependsOn.length) out.depends_on = s.dependsOn;
   if (s.healthCheck) {
@@ -71,9 +106,66 @@ export function serviceToYaml(s: Service): YamlService {
     out.healthcheck = hc;
   }
   if (s.restartPolicy && s.restartPolicy !== 'never') out.restart = s.restartPolicy;
+  if (typeof s.restartMaxAttempts === 'number') out.restart_max_attempts = s.restartMaxAttempts;
+  if (typeof s.restartBackoffMs === 'number') out.restart_backoff_ms = s.restartBackoffMs;
   if (s.autoStart === false) out.auto_start = false;
   if (s.notes) out.notes = s.notes;
+  if (s.provenance) {
+    out.provenance = { source: s.provenance.source };
+    if (s.provenance.detector) out.provenance.detector = s.provenance.detector;
+    if (typeof s.provenance.confidence === 'number') out.provenance.confidence = s.provenance.confidence;
+    if (s.provenance.evidence?.length) out.provenance.evidence = s.provenance.evidence;
+  }
   return out;
+}
+
+export function verificationToYaml(v: ProjectVerification): YamlVerification {
+  const services: YamlVerification['services'] = {};
+  for (const [id, e] of Object.entries(v.services || {})) {
+    services![id] = {
+      started: e.started,
+      healthy: e.healthy,
+      stoppedCleanly: e.stoppedCleanly,
+      detail: e.detail,
+    };
+    if (e.health) services![id]!.health = { ...e.health };
+  }
+  return {
+    status: v.status,
+    verifiedAt: v.verifiedAt,
+    launcherVersion: v.launcherVersion,
+    configFingerprint: v.configFingerprint,
+    environment: v.environment,
+    services,
+    dependencyOrder: v.dependencyOrder,
+    failureClass: v.failureClass,
+    detail: v.detail,
+  };
+}
+
+export function yamlToVerification(y: YamlVerification | undefined): ProjectVerification | undefined {
+  if (!y) return undefined;
+  const services: ProjectVerification['services'] = {};
+  for (const [id, e] of Object.entries(y.services || {})) {
+    services![id] = {
+      started: e.started ?? false,
+      healthy: e.healthy ?? false,
+      stoppedCleanly: e.stoppedCleanly ?? e.stopped_cleanly ?? false,
+      detail: e.detail,
+    };
+    if (e.health) services![id]!.health = { type: e.health.type || 'process', url: e.health.url, port: e.health.port };
+  }
+  return {
+    status: (y.status || 'unknown') as ProjectVerification['status'],
+    verifiedAt: y.verifiedAt || y.verified_at,
+    launcherVersion: y.launcherVersion || y.launcher_version,
+    configFingerprint: y.configFingerprint || y.config_fingerprint,
+    environment: y.environment,
+    services: Object.keys(services!).length ? services : undefined,
+    dependencyOrder: y.dependencyOrder || y.dependency_order,
+    failureClass: y.failureClass || y.failure_class,
+    detail: y.detail,
+  };
 }
 
 export function projectToYaml(p: Project): YamlProject {
@@ -103,22 +195,36 @@ export function projectToYaml(p: Project): YamlProject {
       if (v.description) out.actions[k]!.description = v.description;
     }
   }
+  if (p.verification) out.verification = verificationToYaml(p.verification);
   return out;
 }
+
+type HealthType = NonNullable<Service['healthCheck']>['type'];
 
 export function yamlToProject(y: YamlProject, fallbackRoot: string): Project {
   const root = y.root || fallbackRoot;
   const services: Service[] = Object.entries(y.services || {}).map(([id, s]) => {
     const svc: Service = { id, name: id, command: s.command, cwd: s.cwd };
     if (typeof s.port === 'number') svc.port = s.port;
+    if (s.runtime) svc.runtime = s.runtime as Service['runtime'];
     if (s.environment) svc.environment = s.environment;
     if (s.depends_on) svc.dependsOn = s.depends_on;
     if (s.restart) svc.restartPolicy = s.restart as Service['restartPolicy'];
+    if (typeof s.restart_max_attempts === 'number') svc.restartMaxAttempts = s.restart_max_attempts;
+    if (typeof s.restart_backoff_ms === 'number') svc.restartBackoffMs = s.restart_backoff_ms;
     if (s.auto_start === false) svc.autoStart = false;
     if (s.notes) svc.notes = s.notes;
+    if (s.provenance?.source) {
+      svc.provenance = {
+        source: s.provenance.source as ServiceProvenance['source'],
+        detector: s.provenance.detector,
+        confidence: s.provenance.confidence,
+        evidence: s.provenance.evidence,
+      };
+    }
     const h = s.healthcheck;
     if (h) {
-      svc.healthCheck = { type: h.type as Service['healthCheck'] extends undefined ? never : NonNullable<Service['healthCheck']>['type'] };
+      svc.healthCheck = { type: h.type as HealthType };
       const hc = svc.healthCheck;
       if (h.url) hc.url = h.url;
       if (h.host) hc.host = h.host;
@@ -143,6 +249,7 @@ export function yamlToProject(y: YamlProject, fallbackRoot: string): Project {
     services,
     profiles: Object.keys(profiles).length ? profiles : undefined,
     actions: Object.keys(actions).length ? actions : undefined,
+    verification: yamlToVerification(y.verification),
   };
   if (y.metadata) {
     p.metadata = {

@@ -2,28 +2,47 @@
 
 - Path: `/home/penguin/code/prospectpilot`
 - Confidence: **0.90**
+- Readiness: **needs_docker**
 - Unsafe to auto-run: no
 - Stack signals: Docker, FastAPI, Python
+
+## Blockers
+
+- [docker] Docker daemon unavailable
+  - suggestion: Start the Docker daemon, then retry (launcher never starts it automatically)
+
+## Runnable targets
+
+- `backend-backend` — backend (backend): `.venv/bin/python -m uvicorn app.main:app --reload` (cwd backend)
+- `stack-root` — stack (primary): `docker compose up db`
 
 ## Services
 
 ### db
 - Command: `docker compose up db`
 - Working directory: `.`
+- Runtime: compose
+- Provenance: detector/docker (confidence 0.90)
 
 ### redis
 - Command: `docker compose up redis`
 - Working directory: `.`
+- Runtime: compose
+- Provenance: detector/docker (confidence 0.90)
 
 ### backend
 - Command: `docker compose up backend`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: db, redis
+- Provenance: detector/docker (confidence 0.90)
 
 ### worker
 - Command: `docker compose up worker`
 - Working directory: `.`
+- Runtime: compose
 - Depends on: db, redis
+- Provenance: detector/docker (confidence 0.90)
 
 ## Detector evidence
 

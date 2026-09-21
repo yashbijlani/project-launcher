@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, readdirSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, mkdirSync, statSync, openSync, readSync, closeSync, unlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import type { Project, RuntimeProjectState } from './types.js';
+import type { Project, RuntimeProjectState, Service } from './types.js';
 import { listProjects, loadProject, saveProject, removeProject, slugify } from './config.js';
 import { discover } from './discovery.js';
 import { configPath } from './config.js';
@@ -9,6 +9,9 @@ import { runDetectors } from './detectors/index.js';
 import { configDir, ensureDirs, launcherHome, logDir, stateDir } from './paths.js';
 import { readState, listStates, isProcessAlive, readLease, removeLease } from './state.js';
 import { startLearnSession as _sls, readLearnSession as _rls, finishLearnSession as _fls } from './learn.js';
+import { withDependencies } from './graph.js';
+import { computeConfigFingerprint, isVerificationCurrent } from './fingerprint.js';
+import { computeReadiness } from './prereqs.js';
 
 export interface CliIO {
   out(text: string): void;
@@ -66,12 +69,18 @@ export async function main(argv: string[], io: CliIO = defaultIO): Promise<numbe
       return cmdOpen(positional[0], opts, io);
     case 'action':
       return await cmdAction(positional[0], positional[1], opts, io);
+    case 'verify':
+      return await cmdVerify(positional[0], opts, io);
+    case 'explain':
+      return cmdExplain(positional[0], opts, io);
+    case 'targets':
+      return cmdTargets(positional[0], opts, io);
     case 'learn':
       return cmdLearn(positional[0], opts, io);
     case 'ai-propose':
       return await cmdAiPropose(positional[0], opts, io);
     case 'doctor':
-      return cmdDoctor(opts, io);
+      return cmdDoctor(positional[0], opts, io);
     case 'serve':
       return cmdServe(opts, io);
     case 'ui':
@@ -91,6 +100,8 @@ interface Flags {
   profile?: string;
   service?: string;
   services?: string[];
+  target?: string;
+  clear?: boolean;
   allowUnsafe: boolean;
   follow: boolean;
   _: string[];
@@ -121,6 +132,9 @@ function parseFlags(args: string[]): Flags {
       case '-f':
         flags.follow = true;
         break;
+      case '--clear':
+        flags.clear = true;
+        break;
       case '--profile':
         flags.profile = args[++i];
         break;
@@ -129,6 +143,9 @@ function parseFlags(args: string[]): Flags {
         break;
       case '--services':
         flags.services = (args[++i] || '').split(',').filter(Boolean);
+        break;
+      case '--target':
+        flags.target = args[++i];
         break;
       default:
         flags._.push(a);
@@ -303,6 +320,43 @@ function cmdScanAdd(path: string, opts: Flags, io: CliIO): number {
     return 1;
   }
   const outcome = discover(root, root.split('/').pop());
+  if (opts.target) {
+    const target = outcome.targets.find((t) => t.key === opts.target);
+    if (!target) {
+      io.err(`Unknown target "${opts.target}". Run "launcher targets ${root}" to list runnable targets.`);
+      return 1;
+    }
+    let keep = new Set(withDependencies(outcome.project.services, target.serviceIds));
+    if (!keep.size) {
+      // The target's service was not in the reconciled set (for example, it was
+      // suppressed because a Compose stack was authoritative). Build it directly
+      // from the selected target so the user's explicit choice is honored.
+      const id = slugify(target.role || 'app');
+      const service: Service = {
+        id,
+        name: target.label,
+        command: target.command,
+        cwd: target.cwd,
+        restartPolicy: 'never',
+        provenance: { source: 'detector', confidence: target.confidence },
+      };
+      outcome.project.services = [service];
+      keep = new Set([id]);
+    } else {
+      outcome.project.services = outcome.project.services.filter((s) => keep.has(s.id));
+    }
+    if (outcome.project.profiles) {
+      for (const [name, profile] of Object.entries(outcome.project.profiles)) {
+        profile.services = profile.services.filter((sid) => keep.has(sid));
+        if (!profile.services.length) delete outcome.project.profiles[name];
+      }
+      if (!Object.keys(outcome.project.profiles).length) outcome.project.profiles = undefined;
+    }
+    if (outcome.project.metadata) {
+      outcome.project.metadata.description =
+        `Runnable target "${target.label}" selected from discovery.`;
+    }
+  }
   saveProject(outcome.project);
   if (opts.json) io.out(json({ saved: configPath(outcome.project.id), project: outcome.project }));
   else io.out(`Saved ${outcome.project.name} -> ${configPath(outcome.project.id)} (confidence ${outcome.confidence.toFixed(2)})`);
@@ -360,7 +414,7 @@ async function cmdStart(id: string | undefined, opts: Flags, io: CliIO): Promise
   if (opts.json) {
     const result = await mgr.start({ profile: opts.profile, services: opts.services, allowUnsafe: opts.allowUnsafe, waitHealthy: true });
     io.out(json(result));
-    return result.failed.length ? 1 : 0;
+    return result.failed.length || result.errors.length ? 1 : 0;
   }
 
   mgr.on('log', (line) => io.out(`[${line.id}] ${line.line}`));
@@ -373,7 +427,7 @@ async function cmdStart(id: string | undefined, opts: Flags, io: CliIO): Promise
   for (const e of result.errors) io.out(`  ! ${e.message}`);
   io.out(`\nState dir: ${stateDir()}`);
   io.out(`Logs:      ${logDir()}/${project.id}`);
-  return result.failed.length ? 1 : 0;
+  return result.failed.length || result.errors.length ? 1 : 0;
 }
 
 async function cmdStop(id: string | undefined, opts: Flags, io: CliIO): Promise<number> {
@@ -430,6 +484,9 @@ function cmdStatus(id: string | undefined, opts: Flags, io: CliIO): number {
     return 0;
   }
   io.out(`${project.name} (${project.id})`);
+  const verified = isVerificationCurrent(project);
+  const readiness = computeReadiness(project, verified);
+  io.out(`Config: ${project.verification?.status || 'unverified'}${project.verification ? ` (current=${verified})` : ''}  Readiness: ${readiness.status}`);
   if (!runtime) {
     io.out('  no runtime state (never started)');
     return 0;
@@ -458,10 +515,24 @@ function statusDot(status: string): string {
   }
 }
 
-function cmdLogs(id: string | undefined, opts: Flags, io: CliIO): number {
+function cmdLogs(id: string | undefined, opts: Flags, io: CliIO): number | Promise<number> {
   const project = requireProject(id, io, opts);
   if (!project) return 1;
   const dir = `${logDir()}/${project.id}`;
+  if (opts.clear) {
+    if (opts.json) io.out(json({ cleared: dir }));
+    else io.out(`Clearing logs in ${dir}`);
+    if (existsSync(dir)) {
+      for (const f of readdirSync(dir)) {
+        try {
+          unlinkSync(join(dir, f));
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    return 0;
+  }
   if (!existsSync(dir)) {
     if (opts.json) io.out(json({ files: [] }));
     else io.out('No logs yet.');
@@ -479,6 +550,39 @@ function cmdLogs(id: string | undefined, opts: Flags, io: CliIO): number {
     const content = readFileSync(join(dir, f), 'utf8');
     const lines = content.split('\n');
     io.out(lines.slice(-200).join('\n'));
+  }
+  if (opts.follow) {
+    io.out('\n-- following (Ctrl+C to stop) --');
+    const offsets = new Map<string, number>();
+    for (const f of files) {
+      try {
+        offsets.set(f, statSync(join(dir, f)).size);
+      } catch {
+        offsets.set(f, 0);
+      }
+    }
+    const timer = setInterval(() => {
+      for (const f of files) {
+        try {
+          const size = statSync(join(dir, f)).size;
+          const from = offsets.get(f) || 0;
+          if (size > from) {
+            const fd = openSync(join(dir, f), 'r');
+            const buf = Buffer.alloc(size - from);
+            readSync(fd, buf, 0, buf.length, from);
+            closeSync(fd);
+            const text = buf.toString('utf8');
+            if (text.trim()) io.out(`[${f}] ${text.trimEnd()}`);
+          }
+          offsets.set(f, size);
+        } catch {
+          /* ignore */
+        }
+      }
+    }, 500);
+    timer.unref?.();
+    // Block until the user interrupts; the process exits via SIGINT.
+    return new Promise<number>(() => {});
   }
   return 0;
 }
@@ -590,7 +694,7 @@ async function cmdAiPropose(path: string | undefined, opts: Flags, io: CliIO): P
     return 1;
   }
   const proposal = await provider.analyzeProject(outcome.evidence);
-  const validation = validateProposal(proposal);
+  const validation = validateProposal(proposal, outcome.evidence);
   if (opts.json) {
     io.out(json({ proposal, validation }));
   } else {
@@ -604,10 +708,107 @@ async function cmdAiPropose(path: string | undefined, opts: Flags, io: CliIO): P
 }
 
 // ---------------------------------------------------------------------------
+// verify / explain / targets
+// ---------------------------------------------------------------------------
+
+async function cmdVerify(id: string | undefined, opts: Flags, io: CliIO): Promise<number> {
+  const project = requireProject(id, io, opts);
+  if (!project) return 1;
+  const { verifyProject } = await import('./verify.js');
+  if (opts.json) {
+    io.out(json(await verifyProject(project, { profile: opts.profile, services: opts.services, allowUnsafe: opts.allowUnsafe })));
+    return 0;
+  }
+  io.out(`Verifying ${project.name} (fingerprint ${computeConfigFingerprint(project).slice(0, 12)})...`);
+  const result = await verifyProject(project, { profile: opts.profile, services: opts.services, allowUnsafe: opts.allowUnsafe });
+  io.out(`Status: ${result.status.toUpperCase()}`);
+  if (result.order.length) io.out(`Order: ${result.order.join(' -> ')}`);
+  for (const [sid, ev] of Object.entries(result.services)) {
+    io.out(`  ${ev.started ? '✓' : '✗'} ${sid}: started=${ev.started} healthy=${ev.healthy} stoppedCleanly=${ev.stoppedCleanly}${ev.detail ? ` (${ev.detail})` : ''}`);
+  }
+  if (result.failureClass) io.out(`Failure: ${result.failureClass}: ${result.detail}`);
+  for (const e of result.errors) io.out(`  ! ${e}`);
+  return result.ok ? 0 : 1;
+}
+
+function cmdExplain(id: string | undefined, opts: Flags, io: CliIO): number {
+  const project = requireProject(id, io, opts);
+  if (!project) return 1;
+  const readiness = computeReadiness(project, isVerificationCurrent(project));
+  const payload = {
+    project: project.id,
+    root: project.root,
+    confidence: 'see discovery output',
+    verification: project.verification
+      ? { ...project.verification, current: isVerificationCurrent(project) }
+      : { status: 'unknown', current: false },
+    readiness,
+    services: project.services.map((s) => ({
+      id: s.id,
+      command: s.command,
+      cwd: s.cwd || '.',
+      runtime: s.runtime || 'process',
+      dependsOn: s.dependsOn || [],
+      healthCheck: s.healthCheck,
+      provenance: s.provenance || { source: 'manual' },
+    })),
+  };
+  if (opts.json) {
+    io.out(json(payload));
+    return 0;
+  }
+  io.out(`${project.name} (${project.id})`);
+  io.out(`root: ${project.root}`);
+  io.out(`verification: ${project.verification?.status || 'unknown'}${project.verification ? ` (current=${isVerificationCurrent(project)})` : ''}`);
+  io.out(`readiness: ${readiness.status}`);
+  for (const b of readiness.blockers) io.out(`  blocker [${b.type}]: ${b.message}${b.suggestion ? ` — ${b.suggestion}` : ''}`);
+  for (const s of project.services) {
+    io.out(`\n${s.id}`);
+    io.out(`  command: ${s.command}`);
+    io.out(`  cwd: ${s.cwd || '.'}  runtime: ${s.runtime || 'process'}`);
+    const p = s.provenance;
+    if (p?.source === 'detector') {
+      io.out(`  source: ${p.detector} detector (confidence ${(p.confidence ?? 0).toFixed(2)})`);
+      for (const e of p.evidence || []) io.out(`    evidence: ${e}`);
+    } else {
+      io.out(`  source: ${p?.source || 'manual'}`);
+    }
+    if (s.dependsOn?.length) io.out(`  depends_on: ${s.dependsOn.join(', ')}`);
+  }
+  return 0;
+}
+
+function cmdTargets(path: string | undefined, opts: Flags, io: CliIO): number {
+  if (!path) {
+    io.err('Usage: launcher targets <path>');
+    return 2;
+  }
+  const root = resolve(path);
+  if (!existsSync(root)) {
+    io.err(`Path not found: ${root}`);
+    return 1;
+  }
+  const outcome = discover(root, root.split('/').pop());
+  if (opts.json) {
+    io.out(json({ targets: outcome.targets, warnings: outcome.warnings }));
+    return 0;
+  }
+  io.out(`Runnable targets in ${root}:\n`);
+  if (!outcome.targets.length) io.out('(none detected)');
+  outcome.targets.forEach((t, i) => {
+    io.out(`${i + 1}. [${t.key}] ${t.label} (confidence ${t.confidence.toFixed(2)}${t.primary ? ', primary' : ''})`);
+    io.out(`   $ ${t.command}${t.cwd ? `   (cwd: ${t.cwd})` : ''}`);
+  });
+  io.out('\nSave one with: launcher add <path> --target <key>');
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // doctor / serve / ui
 // ---------------------------------------------------------------------------
 
-function cmdDoctor(opts: Flags, io: CliIO): number {
+function cmdDoctor(id: string | undefined, opts: Flags, io: CliIO): number | Promise<number> {
+  if (id) return cmdDoctorProject(id, opts, io);
   const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
   const nodeMajor = Number(process.versions.node.split('.')[0]);
   checks.push({ name: 'node', ok: nodeMajor >= 20, detail: process.versions.node });
@@ -634,6 +835,34 @@ function cmdDoctor(opts: Flags, io: CliIO): number {
     for (const c of checks) io.out(`${c.ok ? '✓' : '✗'} ${c.name}: ${c.detail}`);
   }
   return checks.every((c) => c.ok) ? 0 : 1;
+}
+
+function cmdDoctorProject(id: string, opts: Flags, io: CliIO): Promise<number> {
+  const project = requireProject(id, io, opts);
+  if (!project) return Promise.resolve(1);
+  return cmdDoctorProjectInner(project, opts, io);
+}
+
+async function cmdDoctorProjectInner(project: Project, opts: Flags, io: CliIO): Promise<number> {
+  const { checkPrereqs } = await import('./prereqs.js');
+  const readiness = computeReadiness(project, isVerificationCurrent(project));
+  const prereqs = checkPrereqs(project);
+  const env = prereqs.environment;
+  if (opts.json) {
+    io.out(json({ project: project.id, readiness, environment: env }));
+    return readiness.status === 'ready' || readiness.status === 'ready_but_unverified' ? 0 : 1;
+  }
+  io.out(`${project.name}`);
+  io.out(`  Node:    ${env.nodeVersion || 'missing'}`);
+  io.out(`  Python:  ${env.pythonVersion || 'not detected'}`);
+  io.out(`  Docker:  ${env.dockerVersion || 'missing'}${env.dockerDaemon === false ? ' (daemon unavailable)' : ''}`);
+  io.out(`  Readiness: ${readiness.status}`);
+  if (!readiness.blockers.length) io.out('  ✓ no blockers');
+  for (const b of readiness.blockers) {
+    io.out(`  ✗ [${b.type}] ${b.message}`);
+    if (b.suggestion) io.out(`      ${b.suggestion}`);
+  }
+  return readiness.status === 'ready' || readiness.status === 'ready_but_unverified' ? 0 : 1;
 }
 
 function mkdirp(p: string): boolean {
@@ -690,11 +919,14 @@ Lifecycle
   logs <project> [--service NAME] [--json]
   open <project> [--json]
   action <project> <name>
+  verify <project> [--profile NAME] [--allow-unsafe] [--json]
+  explain <project> [--json]
+  targets <path> [--json]
 
 Advanced
   learn <path>               Start an opt-in learning session
   learn <path> --finish      Finish the session and propose a learned config
-  doctor [--json]            Verify the environment and clean orphaned leases
+  doctor [project] [--json]  Environment checks, or per-project readiness
   serve                      Start the local HTTP API for the desktop UI
   ui                         Start the desktop launcher UI
 

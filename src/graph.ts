@@ -1,7 +1,7 @@
 import type { Service } from './types.js';
 
 export interface GraphError {
-  kind: 'cycle' | 'missing-dependency';
+  kind: 'cycle' | 'missing-dependency' | 'locked';
   message: string;
   nodes: string[];
 }

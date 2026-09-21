@@ -36,6 +36,15 @@ export interface LogLine {
 
 const TAIL_LIMIT = 16 * 1024;
 
+/** Prefix complete lines with ISO timestamps for persisted file logs. */
+export function withTimestamps(text: string): string {
+  const stamp = new Date().toISOString();
+  const endsWithNewline = text.endsWith('\n');
+  const lines = endsWithNewline ? text.slice(0, -1).split('\n') : text.split('\n');
+  const out = lines.map((line) => `[${stamp}] ${line}`).join('\n');
+  return endsWithNewline ? out + '\n' : out;
+}
+
 export class SupervisedProcess extends EventEmitter {
   readonly id: string;
   private child: ChildProcess | null = null;
@@ -95,13 +104,13 @@ export class SupervisedProcess extends EventEmitter {
     child.stdout?.on('data', (buf: Buffer) => {
       const text = buf.toString('utf8');
       this.outTail = (this.outTail + text).slice(-TAIL_LIMIT);
-      this.outStream?.write(text);
+      this.outStream?.write(withTimestamps(text));
       this.emitLines('stdout', text);
     });
     child.stderr?.on('data', (buf: Buffer) => {
       const text = buf.toString('utf8');
       this.errTail = (this.errTail + text).slice(-TAIL_LIMIT);
-      this.errStream?.write(text);
+      this.errStream?.write(withTimestamps(text));
       this.emitLines('stderr', text);
     });
 

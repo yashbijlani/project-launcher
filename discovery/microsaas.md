@@ -2,8 +2,13 @@
 
 - Path: `/home/penguin/code/microsaas`
 - Confidence: **0.00**
+- Readiness: **unknown**
 - Unsafe to auto-run: no
 - Stack signals: (none)
+
+## Blockers
+
+- [unknown] No services configured; run discovery or add services manually
 
 ## Services
 

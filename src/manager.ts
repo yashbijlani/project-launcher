@@ -5,6 +5,7 @@ import type {
   Service,
   RuntimeProjectState,
   ServiceStatus,
+  UnsafeApproval,
 } from './types.js';
 import { SupervisedProcess, classifyFailure, type LogLine, type ExitInfo } from './supervisor.js';
 import { buildStartPlan, validateProfile, withDependencies, withDependents, type GraphError } from './graph.js';
@@ -16,8 +17,10 @@ import {
   writeLease,
   removeLease,
   mergeServiceStatus,
-  isProcessAlive,
 } from './state.js';
+import { acquireLock, releaseLock, startHeartbeat, type ProjectLock } from './lock.js';
+import { assertSafeToOperate } from './safety.js';
+import { readProcessIdentity, identityMatches } from './proc.js';
 
 export interface StartOptions {
   profile?: string;
@@ -26,8 +29,9 @@ export interface StartOptions {
   continueOnError?: boolean;
   /** Wait for health checks before returning. */
   waitHealthy?: boolean;
-  /** Safety gate: if project is marked unsafe, must be true. */
+  /** Safety gate: if project is marked unsafe, must be true or accompanied by approval. */
   allowUnsafe?: boolean;
+  unsafeApproval?: UnsafeApproval;
 }
 
 export interface StartResult {
@@ -49,23 +53,40 @@ export class ProjectManager extends EventEmitter {
   private state: RuntimeProjectState;
   private healthTimers = new Map<string, NodeJS.Timeout>();
   private desiredRunning = new Set<string>();
+  private crashTimes = new Map<string, number[]>();
 
   constructor(project: Project) {
     super();
     this.project = project;
     this.state = { projectId: project.id, name: project.name, services: {} };
     // Seed from persisted state so a fresh CLI invocation can reclaim orphans.
+    // PIDs are only trusted when their persisted identity still matches.
     const persisted = readState(project.id);
     for (const s of project.services) {
       const prev = persisted?.services[s.id];
-      this.state.services[s.id] = {
+      const seeded = {
         id: s.id,
-        status: prev?.status && prev.pid && isProcessAlive(prev.pid) ? prev.status : 'stopped',
+        status: 'stopped' as ServiceStatus,
         restarts: prev?.restarts ?? 0,
-        health: prev?.health ?? { status: 'unknown' },
-        pid: prev?.pid && isProcessAlive(prev.pid) ? prev.pid : undefined,
+        health: prev?.health ?? { status: 'unknown' as const },
+        pid: undefined as number | undefined,
+        process: undefined as RuntimeProjectState['services'][string]['process'],
         startedAt: prev?.startedAt,
       };
+      if (prev?.pid) {
+        if (prev.process) {
+          if (identityMatches(prev.process, readProcessIdentity(prev.pid))) {
+            seeded.status = prev.status;
+            seeded.pid = prev.pid;
+            seeded.process = prev.process;
+          }
+        } else if (readProcessIdentity(prev.pid)) {
+          // Legacy V1 state without identity: trust once, identity will be captured on next start.
+          seeded.status = prev.status;
+          seeded.pid = prev.pid;
+        }
+      }
+      this.state.services[s.id] = seeded;
     }
   }
 
@@ -115,71 +136,107 @@ export class ProjectManager extends EventEmitter {
       errors: [],
     };
 
-    if (this.project.metadata?.unsafe && !opts.allowUnsafe) {
+    // Single authoritative safety gate (shared with the HTTP server).
+    const gate = assertSafeToOperate(this.project, {
+      allowUnsafe: opts.allowUnsafe,
+      unsafeApproval: opts.unsafeApproval,
+      operation: 'start',
+    });
+    if (!gate.ok) {
+      for (const message of gate.errors) {
+        result.errors.push({ kind: 'missing-dependency', message, nodes: [] });
+      }
+      return result;
+    }
+
+    // Ownership: only one launcher instance may drive a project at a time.
+    const acquired = acquireLock(this.project.id, 'start');
+    if (!acquired.ok) {
       result.errors.push({
-        kind: 'missing-dependency',
-        message: `Project "${this.project.name}" is marked UNSAFE TO AUTO-RUN: ${this.project.metadata.unsafeReason || 'unknown reason'}. Pass allowUnsafe to override.`,
+        kind: 'locked',
+        message: acquired.busyReason || 'Project is already owned by another launcher instance',
         nodes: [],
       });
       return result;
     }
+    const lock: ProjectLock = acquired.lock!;
+    const stopHeartbeat = startHeartbeat(lock);
 
-    const { ids, errors } = this.resolveServices(opts);
-    result.errors.push(...errors);
-    const fatal = errors.filter((e) => e.kind === 'cycle' || e.kind === 'missing-dependency');
-    if (fatal.length) return result;
+    try {
+      await this.reconcileWithIdentity();
 
-    const selected = this.project.services.filter((s) => ids.includes(s.id));
-    const plan = buildStartPlan(selected);
-    result.errors.push(...plan.errors);
-    if (plan.errors.some((e) => e.kind === 'cycle')) return result;
+      const { ids, errors } = this.resolveServices(opts);
+      result.errors.push(...errors);
+      const fatal = errors.filter((e) => e.kind === 'cycle' || e.kind === 'missing-dependency');
+      if (fatal.length) return result;
 
-    mkdirSync(logDir(), { recursive: true });
-    const projectLogDir = logDir() + '/' + this.project.id;
+      const selected = this.project.services.filter((s) => ids.includes(s.id));
+      const plan = buildStartPlan(selected);
+      result.errors.push(...plan.errors);
+      if (plan.errors.some((e) => e.kind === 'cycle')) return result;
 
-    writeLease({
-      projectId: this.project.id,
-      supervisorPid: process.pid,
-      startedAt: Date.now(),
-      processes: {},
-    });
+      mkdirSync(logDir(), { recursive: true });
+      const projectLogDir = logDir() + '/' + this.project.id;
 
-    this.state.startedAt = Date.now();
-    this.emitState();
+      writeLease({
+        projectId: this.project.id,
+        supervisorPid: process.pid,
+        startedAt: Date.now(),
+        processes: {},
+      });
 
-    const waitHealthy = opts.waitHealthy !== false;
+      this.state.startedAt = Date.now();
+      this.emitState();
 
-    for (const id of plan.order) {
-      const svc = this.serviceById(id);
-      if (!svc) continue;
+      const waitHealthy = opts.waitHealthy !== false;
 
-      // Check dependencies succeeded (healthy if a health check exists, else running)
-      const unmet: string[] = [];
-      for (const dep of svc.dependsOn || []) {
-        const depState = this.state.services[dep];
-        const ok = depState && (depState.status === 'healthy' || depState.status === 'running');
-        if (!ok) unmet.push(dep);
+      for (const id of plan.order) {
+        const svc = this.serviceById(id);
+        if (!svc) continue;
+
+        // A service already running under verified ownership is not started twice.
+        const existing = this.state.services[id];
+        if (
+          existing &&
+          (existing.status === 'healthy' || existing.status === 'running') &&
+          existing.pid &&
+          identityMatches(existing.process, readProcessIdentity(existing.pid))
+        ) {
+          result.started.push(id);
+          continue;
+        }
+
+        // Check dependencies succeeded (healthy if a health check exists, else running)
+        const unmet: string[] = [];
+        for (const dep of svc.dependsOn || []) {
+          const depState = this.state.services[dep];
+          const ok = depState && (depState.status === 'healthy' || depState.status === 'running');
+          if (!ok) unmet.push(dep);
+        }
+        if (unmet.length) {
+          const detail = `dependency not ready: ${unmet.join(', ')}`;
+          this.setStatus(id, 'failed');
+          result.failed.push({ id, failureClass: 'SERVICE_ORDER', detail });
+          if (!opts.continueOnError) break;
+          continue;
+        }
+
+        const startResult = await this.startService(svc, projectLogDir, waitHealthy);
+        if (startResult.ok) {
+          result.started.push(id);
+        } else {
+          result.failed.push({ id, failureClass: startResult.failureClass, detail: startResult.detail });
+          if (!opts.continueOnError) break;
+        }
       }
-      if (unmet.length) {
-        const detail = `dependency not ready: ${unmet.join(', ')}`;
-        this.setStatus(id, 'failed');
-        result.failed.push({ id, failureClass: 'SERVICE_ORDER', detail });
-        if (!opts.continueOnError) break;
-        continue;
-      }
 
-      const startResult = await this.startService(svc, projectLogDir, waitHealthy);
-      if (startResult.ok) {
-        result.started.push(id);
-      } else {
-        result.failed.push({ id, failureClass: startResult.failureClass, detail: startResult.detail });
-        if (!opts.continueOnError) break;
-      }
+      this.updateLease();
+      this.emitState();
+      return result;
+    } finally {
+      stopHeartbeat();
+      releaseLock(lock);
     }
-
-    this.updateLease();
-    this.emitState();
-    return result;
   }
 
   private async startService(
@@ -189,6 +246,15 @@ export class ProjectManager extends EventEmitter {
   ): Promise<{ ok: boolean; failureClass: string; detail: string }> {
     if (this.procs.has(svc.id) && this.procs.get(svc.id)!.running) {
       return { ok: true, failureClass: 'UNKNOWN', detail: 'already running' };
+    }
+    // Owned by a previous invocation and still verifiably ours: do not duplicate.
+    const st = this.state.services[svc.id];
+    if (
+      st?.pid &&
+      (st.status === 'healthy' || st.status === 'running') &&
+      identityMatches(st.process, readProcessIdentity(st.pid))
+    ) {
+      return { ok: true, failureClass: 'UNKNOWN', detail: 'already running (verified ownership)' };
     }
     this.setStatus(svc.id, 'starting', { startedAt: Date.now() });
     const proc = new SupervisedProcess({
@@ -213,14 +279,26 @@ export class ProjectManager extends EventEmitter {
     });
     proc.on('exit', (info: ExitInfo) => {
       const policy = svc.restartPolicy || 'never';
-      if (policy === 'always' || (policy === 'on-failure' && info.code !== 0)) {
-        if (this.desiredRunning.has(svc.id) && this.state.services[svc.id]) {
-          const restarts = (this.state.services[svc.id]!.restarts || 0) + 1;
-          this.setStatus(svc.id, 'starting', { restarts });
-          this.emitLog({ id: svc.id, stream: 'system', line: `restart policy=${policy}, restart #${restarts}`, at: Date.now() });
-          setTimeout(() => void this.startService(svc, projectLogDir, false), 1000);
-        }
+      if (policy === 'never' || info.code === 0) return;
+      if (!this.desiredRunning.has(svc.id) || !this.state.services[svc.id]) return;
+      // Restart safeguards: sliding 60s window, max attempts, exponential backoff.
+      const now = Date.now();
+      const maxAttempts = svc.restartMaxAttempts ?? 5;
+      const baseBackoff = svc.restartBackoffMs ?? 1000;
+      const history = (this.crashTimes.get(svc.id) || []).filter((t) => now - t < 60_000);
+      history.push(now);
+      this.crashTimes.set(svc.id, history);
+      if (history.length > maxAttempts) {
+        this.emitLog({ id: svc.id, stream: 'system', line: `restart loop suppressed: ${history.length} crashes in 60s (max ${maxAttempts})`, at: now });
+        this.setStatus(svc.id, 'failed');
+        this.desiredRunning.delete(svc.id);
+        return;
       }
+      const restarts = (this.state.services[svc.id]!.restarts || 0) + 1;
+      const backoff = Math.min(baseBackoff * 2 ** (history.length - 1), 30_000);
+      this.setStatus(svc.id, 'starting', { restarts });
+      this.emitLog({ id: svc.id, stream: 'system', line: `restart policy=${policy}, restart #${restarts} in ${backoff}ms`, at: now });
+      setTimeout(() => void this.startService(svc, projectLogDir, false), backoff);
     });
 
     try {
@@ -232,6 +310,12 @@ export class ProjectManager extends EventEmitter {
     }
 
     this.setStatus(svc.id, 'running', { pid: proc.pid, startedAt: Date.now() });
+    const identity = await captureIdentity(proc.pid);
+    if (identity) {
+      this.setStatus(svc.id, 'running', { process: identity });
+    } else {
+      this.emitLog({ id: svc.id, stream: 'system', line: 'warning: could not read process identity; ownership verification unavailable', at: Date.now() });
+    }
     this.updateLease();
 
     // Determine health behavior: explicit check, else implicit tcp if port known, else process-only.
@@ -245,7 +329,10 @@ export class ProjectManager extends EventEmitter {
         const info = proc.exitInfo;
         const stderr = info?.stderrTail || '';
         const failureClass = classifyFailure(info, stderr, info?.stdoutTail || '');
-        this.setStatus(svc.id, 'crashed', { exitCode: info?.code ?? null });
+        // A restart-loop suppression may have already marked this failed; keep that verdict.
+        if (this.state.services[svc.id]?.status !== 'failed') {
+          this.setStatus(svc.id, 'crashed', { exitCode: info?.code ?? null });
+        }
         this.desiredRunning.delete(svc.id);
         return { ok: false, failureClass, detail: firstLines(stderr) || 'process exited during startup' };
       }
@@ -269,7 +356,9 @@ export class ProjectManager extends EventEmitter {
     if (!proc.running) {
       const info = proc.exitInfo;
       const failureClass = classifyFailure(info, info?.stderrTail || '', info?.stdoutTail || '');
-      this.setStatus(svc.id, 'crashed');
+      if (this.state.services[svc.id]?.status !== 'failed') {
+        this.setStatus(svc.id, 'crashed');
+      }
       this.desiredRunning.delete(svc.id);
       return {
         ok: false,
@@ -316,7 +405,7 @@ export class ProjectManager extends EventEmitter {
     this.emitState();
   }
 
-  private setStatus(id: string, status: ServiceStatus, extra: Partial<{ exitCode: number | null; signal: string | null; stoppedAt: number; startedAt: number; pid: number; restarts: number }> = {}): void {
+  private setStatus(id: string, status: ServiceStatus, extra: Partial<{ exitCode: number | null; signal: string | null; stoppedAt: number; startedAt: number; pid: number; process: RuntimeProjectState['services'][string]['process']; restarts: number }> = {}): void {
     mergeServiceStatus(this.state, id, { status, ...extra });
     this.emitState();
   }
@@ -334,88 +423,138 @@ export class ProjectManager extends EventEmitter {
 
   /** Gracefully stop the given services (or all) in reverse dependency order. */
   async stop(serviceIds?: string[], graceMs = 5000): Promise<{ stopped: string[]; failures: string[] }> {
-    // Stopping a service must also stop anything that depends on it, otherwise
-    // we leave dependents running against a dependency that is gone.
-    const expandedIds = serviceIds?.length ? withDependents(this.project.services, serviceIds) : undefined;
-    const selected = expandedIds
-      ? this.project.services.filter((s) => expandedIds.includes(s.id))
-      : this.project.services;
-    const plan = buildStartPlan(selected);
-    const order = [...plan.order].reverse();
+    const acquired = acquireLock(this.project.id, 'stop');
+    if (!acquired.ok) {
+      return { stopped: [], failures: [acquired.busyReason || 'Project is already owned by another launcher instance'] };
+    }
+    const lock = acquired.lock!;
+    const stopHeartbeat = startHeartbeat(lock);
+    try {
+      await this.reconcileWithIdentity();
 
-    for (const id of order) this.desiredRunning.delete(id);
+      // Stopping a service must also stop anything that depends on it, otherwise
+      // we leave dependents running against a dependency that is gone.
+      const expandedIds = serviceIds?.length ? withDependents(this.project.services, serviceIds) : undefined;
+      const selected = expandedIds
+        ? this.project.services.filter((s) => expandedIds.includes(s.id))
+        : this.project.services;
+      const plan = buildStartPlan(selected);
+      const order = [...plan.order].reverse();
 
-    const stopped: string[] = [];
-    const failures: string[] = [];
+      for (const id of order) this.desiredRunning.delete(id);
 
-    for (const id of order) {
-      const proc = this.procs.get(id);
-      const svcState = this.state.services[id];
-      // Also handle orphaned processes from a previous launcher instance.
-      if (!proc && svcState?.pid && isProcessAlive(svcState.pid)) {
-        this.emitLog({ id, stream: 'system', line: `reclaiming orphaned pid ${svcState.pid}`, at: Date.now() });
-        try {
-          process.kill(-svcState.pid, 'SIGTERM');
-        } catch {
-          try {
-            process.kill(svcState.pid, 'SIGTERM');
-          } catch {
-            /* ignore */
+      const stopped: string[] = [];
+      const failures: string[] = [];
+
+      for (const id of order) {
+        const proc = this.procs.get(id);
+        const svcState = this.state.services[id];
+        // Reclaim orphans from a previous launcher instance, but ONLY when the
+        // persisted identity still matches. Never signal on PID alone.
+        if (!proc && svcState?.pid) {
+          const actual = readProcessIdentity(svcState.pid);
+          if (!identityMatches(svcState.process, actual)) {
+            if (actual) {
+              this.emitLog({ id, stream: 'system', line: `stale state: pid ${svcState.pid} is now an unrelated process; refusing to signal`, at: Date.now() });
+            }
+            this.setStatus(id, 'stopped', { stoppedAt: Date.now() });
+            const cur = this.state.services[id];
+            if (cur) {
+              cur.pid = undefined;
+              cur.process = undefined;
+            }
+            this.emitState();
+            continue;
           }
-        }
-        await sleep(500);
-        if (isProcessAlive(svcState.pid)) {
+          this.emitLog({ id, stream: 'system', line: `reclaiming verified pid ${svcState.pid}`, at: Date.now() });
           try {
-            process.kill(-svcState.pid, 'SIGKILL');
+            process.kill(-svcState.pid, 'SIGTERM');
           } catch {
             try {
-              process.kill(svcState.pid, 'SIGKILL');
+              process.kill(svcState.pid, 'SIGTERM');
             } catch {
               /* ignore */
             }
           }
+          await sleep(500);
+          if (readProcessIdentity(svcState.pid)) {
+            try {
+              process.kill(-svcState.pid, 'SIGKILL');
+            } catch {
+              try {
+                process.kill(svcState.pid, 'SIGKILL');
+              } catch {
+                /* ignore */
+              }
+            }
+          }
+          this.setStatus(id, 'stopped', { stoppedAt: Date.now() });
+          stopped.push(id);
+          continue;
         }
-        this.setStatus(id, 'stopped', { stoppedAt: Date.now() });
-        stopped.push(id);
-        continue;
+        if (!proc) {
+          this.setStatus(id, 'stopped', { stoppedAt: Date.now() });
+          continue;
+        }
+        this.setStatus(id, 'stopping');
+        const timer = this.healthTimers.get(id);
+        if (timer) {
+          clearInterval(timer);
+          this.healthTimers.delete(id);
+        }
+        const info = await proc.stop(graceMs);
+        this.procs.delete(id);
+        if (info) {
+          this.setStatus(id, 'stopped', {
+            exitCode: info.code,
+            signal: info.signal,
+            stoppedAt: Date.now(),
+          });
+          stopped.push(id);
+        } else {
+          this.setStatus(id, 'stopped', { stoppedAt: Date.now() });
+          stopped.push(id);
+        }
       }
-      if (!proc) {
-        this.setStatus(id, 'stopped', { stoppedAt: Date.now() });
-        continue;
-      }
-      this.setStatus(id, 'stopping');
-      const timer = this.healthTimers.get(id);
-      if (timer) {
-        clearInterval(timer);
-        this.healthTimers.delete(id);
-      }
-      const info = await proc.stop(graceMs);
-      this.procs.delete(id);
-      if (info) {
-        this.setStatus(id, 'stopped', {
-          exitCode: info.code,
-          signal: info.signal,
-          stoppedAt: Date.now(),
-        });
-        stopped.push(id);
-      } else {
-        this.setStatus(id, 'stopped', { stoppedAt: Date.now() });
-        stopped.push(id);
-      }
-    }
 
-    removeLease(this.project.id);
-    this.emitState();
-    return { stopped, failures };
+      removeLease(this.project.id);
+      this.emitState();
+      return { stopped, failures };
+    } finally {
+      stopHeartbeat();
+      releaseLock(lock);
+    }
   }
 
-  /** Reconcile state with the OS: mark services whose PIDs are gone as crashed. */
-  async reconcileOnAttach(): Promise<void> {
+  /**
+   * Reconcile persisted state with the OS using process identity, not PID alone.
+   * - identity matches -> keep live status
+   * - PID alive but identity differs -> stale; clear without signaling
+   * - PID gone -> crashed
+   */
+  async reconcileWithIdentity(): Promise<{ stale: string[] }> {
+    const stale: string[] = [];
     for (const [id, svcState] of Object.entries(this.state.services)) {
-      if (svcState.pid && svcState.status !== 'stopped' && !isProcessAlive(svcState.pid)) {
+      if (!svcState.pid) continue;
+      const actual = readProcessIdentity(svcState.pid);
+      if (identityMatches(svcState.process, actual)) continue;
+      if (actual) {
+        stale.push(id);
+        this.emitLog({ id, stream: 'system', line: `stale state: pid ${svcState.pid} no longer matches; cleared without signaling`, at: Date.now() });
+        this.setStatus(id, 'stopped', { stoppedAt: Date.now() });
+        svcState.pid = undefined;
+        svcState.process = undefined;
+        this.emitState();
+      } else if (svcState.status !== 'stopped') {
         this.setStatus(id, 'crashed', { exitCode: null });
       }
     }
+    return { stale };
+  }
+
+  /** Backwards-compatible wrapper. */
+  async reconcileOnAttach(): Promise<void> {
+    await this.reconcileWithIdentity();
   }
 
   logsDir(): string {
@@ -425,6 +564,17 @@ export class ProjectManager extends EventEmitter {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Read /proc identity for a just-spawned pid, retrying briefly for visibility. */
+async function captureIdentity(pid: number | undefined): Promise<RuntimeProjectState['services'][string]['process']> {
+  if (!pid) return undefined;
+  for (let i = 0; i < 10; i++) {
+    const identity = readProcessIdentity(pid);
+    if (identity) return identity;
+    await sleep(100);
+  }
+  return undefined;
 }
 
 async function sleepCheckExit(proc: SupervisedProcess, ms: number): Promise<boolean> {

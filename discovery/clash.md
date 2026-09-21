@@ -2,6 +2,7 @@
 
 - Path: `/home/penguin/code/clash`
 - Confidence: **0.95**
+- Readiness: **ready_but_unverified**
 - Unsafe to auto-run: no
 - Stack signals: Node
 
@@ -12,6 +13,7 @@
 - Working directory: `.`
 - Port: 3000
 - Health: {"type":"http","url":"http://localhost:3000","startPeriodMs":30000}
+- Provenance: detector/node (confidence 0.95)
 
 ## Detector evidence
 

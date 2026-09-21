@@ -2,6 +2,7 @@
   {
     "name": "agentdock",
     "confidence": 0.5,
+    "readiness": "unsafe",
     "unsafe": true,
     "services": 1,
     "commands": [
@@ -10,8 +11,18 @@
     "manual": false
   },
   {
+    "name": "autonomous-contributor",
+    "confidence": 0,
+    "readiness": "unknown",
+    "unsafe": false,
+    "services": 0,
+    "commands": [],
+    "manual": true
+  },
+  {
     "name": "blindfold-chess",
     "confidence": 0.5,
+    "readiness": "needs_device",
     "unsafe": true,
     "services": 1,
     "commands": [
@@ -21,7 +32,8 @@
   },
   {
     "name": "book-copilot",
-    "confidence": 0.95,
+    "confidence": 0.9,
+    "readiness": "needs_docker",
     "unsafe": false,
     "services": 3,
     "commands": [
@@ -34,6 +46,7 @@
   {
     "name": "bullet_engine",
     "confidence": 0.55,
+    "readiness": "ready_but_unverified",
     "unsafe": false,
     "services": 1,
     "commands": [
@@ -44,6 +57,7 @@
   {
     "name": "camera-copilot",
     "confidence": 0.5,
+    "readiness": "needs_device",
     "unsafe": true,
     "services": 1,
     "commands": [
@@ -54,6 +68,7 @@
   {
     "name": "clash",
     "confidence": 0.95,
+    "readiness": "ready_but_unverified",
     "unsafe": false,
     "services": 1,
     "commands": [
@@ -64,6 +79,7 @@
   {
     "name": "desktop-tutor",
     "confidence": 0.55,
+    "readiness": "needs_credentials",
     "unsafe": false,
     "services": 1,
     "commands": [
@@ -74,6 +90,7 @@
   {
     "name": "freedom",
     "confidence": 0.5,
+    "readiness": "unsafe",
     "unsafe": true,
     "services": 1,
     "commands": [
@@ -84,6 +101,7 @@
   {
     "name": "gaze_scroll",
     "confidence": 0.95,
+    "readiness": "ready_but_unverified",
     "unsafe": false,
     "services": 1,
     "commands": [
@@ -94,29 +112,22 @@
   {
     "name": "geb",
     "confidence": 0,
+    "readiness": "unknown",
     "unsafe": false,
     "services": 0,
     "commands": [],
     "manual": true
   },
   {
-    "name": "gods-eye-view",
-    "confidence": 0.95,
-    "unsafe": false,
-    "services": 1,
-    "commands": [
-      "npm run dev"
-    ],
-    "manual": false
-  },
-  {
     "name": "human-broker",
     "confidence": 0.95,
+    "readiness": "needs_environment",
     "unsafe": false,
-    "services": 4,
+    "services": 5,
     "commands": [
       "docker compose up postgres",
       "docker compose up redis",
+      "npm run dev",
       "npm run dev",
       "../../.venv/bin/python -m uvicorn app.main:app --reload"
     ],
@@ -125,6 +136,7 @@
   {
     "name": "infinite_zoom",
     "confidence": 0.5,
+    "readiness": "needs_device",
     "unsafe": true,
     "services": 1,
     "commands": [
@@ -135,6 +147,7 @@
   {
     "name": "jobhunter",
     "confidence": 0.95,
+    "readiness": "needs_credentials",
     "unsafe": false,
     "services": 3,
     "commands": [
@@ -147,6 +160,7 @@
   {
     "name": "microsaas",
     "confidence": 0,
+    "readiness": "unknown",
     "unsafe": false,
     "services": 0,
     "commands": [],
@@ -155,6 +169,7 @@
   {
     "name": "musicalbook",
     "confidence": 0.95,
+    "readiness": "ready_but_unverified",
     "unsafe": false,
     "services": 1,
     "commands": [
@@ -163,16 +178,9 @@
     "manual": false
   },
   {
-    "name": "omarchy",
-    "confidence": 0,
-    "unsafe": false,
-    "services": 0,
-    "commands": [],
-    "manual": true
-  },
-  {
     "name": "phoneaway",
     "confidence": 0.5,
+    "readiness": "needs_device",
     "unsafe": true,
     "services": 1,
     "commands": [
@@ -183,6 +191,7 @@
   {
     "name": "polymarket",
     "confidence": 0.95,
+    "readiness": "needs_docker",
     "unsafe": false,
     "services": 7,
     "commands": [
@@ -199,6 +208,7 @@
   {
     "name": "prospectpilot",
     "confidence": 0.9,
+    "readiness": "needs_docker",
     "unsafe": false,
     "services": 4,
     "commands": [
@@ -212,6 +222,7 @@
   {
     "name": "restaurantbills",
     "confidence": 0.95,
+    "readiness": "ready_but_unverified",
     "unsafe": false,
     "services": 2,
     "commands": [
@@ -223,20 +234,11 @@
   {
     "name": "rune",
     "confidence": 0.5,
+    "readiness": "needs_device",
     "unsafe": true,
     "services": 1,
     "commands": [
       "./gradlew build"
-    ],
-    "manual": false
-  },
-  {
-    "name": "vercel",
-    "confidence": 0.6,
-    "unsafe": false,
-    "services": 1,
-    "commands": [
-      "python3 main.py"
     ],
     "manual": false
   }
