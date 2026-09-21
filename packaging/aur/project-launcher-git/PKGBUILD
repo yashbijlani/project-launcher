@@ -1,0 +1,46 @@
+# Maintainer: Yash Bijlani <yashbijlani2004@gmail.com>
+pkgname=project-launcher-git
+pkgver=r3.bfaf78d
+pkgrel=1
+pkgdesc="Deterministic local project launcher and supervisor: discover, verify, start, and stop multi-service development repositories"
+arch=('any')
+url="https://github.com/yashbijlani/project-launcher"
+license=('MIT')
+depends=('nodejs')
+makedepends=('npm')
+provides=('project-launcher')
+conflicts=('project-launcher')
+source=("$pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$pkgname"
+  printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cd "$pkgname"
+  npm ci --no-audit --no-fund
+  npm run build
+  # Keep only production dependencies so package() needs no network.
+  npm prune --omit=dev --no-audit --no-fund
+  find node_modules -type d -empty -delete
+}
+
+package() {
+  cd "$pkgname"
+
+  # Ship the runtime only: compiled output, entrypoint, manifest, production deps.
+  install -d "$pkgdir/usr/lib/$pkgname"
+  cp -r bin dist package.json package-lock.json node_modules "$pkgdir/usr/lib/$pkgname/"
+
+  install -d "$pkgdir/usr/bin"
+  cat > "$pkgdir/usr/bin/launcher" <<'EOF'
+#!/bin/sh
+exec /usr/bin/node /usr/lib/project-launcher-git/bin/launcher.js "$@"
+EOF
+  chmod 755 "$pkgdir/usr/bin/launcher"
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
