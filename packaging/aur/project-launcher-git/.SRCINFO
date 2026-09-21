@@ -1,0 +1,15 @@
+pkgbase = project-launcher-git
+	pkgdesc = Deterministic local project launcher and supervisor: discover, verify, start, and stop multi-service development repositories
+	pkgver = r3.11df433
+	pkgrel = 1
+	url = https://github.com/yashbijlani/project-launcher
+	arch = any
+	license = MIT
+	makedepends = npm
+	depends = nodejs
+	provides = project-launcher
+	conflicts = project-launcher
+	source = project-launcher-git::git+https://github.com/yashbijlani/project-launcher.git
+	sha256sums = SKIP
+
+pkgname = project-launcher-git

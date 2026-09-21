@@ -1,6 +1,6 @@
 # Maintainer: Yash Bijlani <yashbijlani2004@gmail.com>
 pkgname=project-launcher-git
-pkgver=r3.bfaf78d
+pkgver=r3.11df433
 pkgrel=1
 pkgdesc="Deterministic local project launcher and supervisor: discover, verify, start, and stop multi-service development repositories"
 arch=('any')
